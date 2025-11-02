@@ -44,6 +44,12 @@ def create_app(config: Config) -> FastAPI:
     app.include_router(admin_router, prefix="/api")
     app.include_router(websocket_router)
 
+    # Health check endpoint (must be before catch-all route)
+    @app.get("/health")
+    async def health_check():
+        """Health check endpoint."""
+        return {"status": "healthy"}
+
     # Serve frontend static files if they exist
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     if frontend_dist.exists():
@@ -65,16 +71,11 @@ def create_app(config: Config) -> FastAPI:
     async def startup_event():
         """Run on application startup."""
         logger.info("FastAPI application starting up")
-    
+
     @app.on_event("shutdown")
     async def shutdown_event():
         """Run on application shutdown."""
         logger.info("FastAPI application shutting down")
-    
-    @app.get("/health")
-    async def health_check():
-        """Health check endpoint."""
-        return {"status": "healthy"}
     
     return app
 
