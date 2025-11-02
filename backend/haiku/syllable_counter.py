@@ -155,26 +155,38 @@ def count_syllables(text: str) -> int:
             pyphen_count = _count_syllables_pyphen(part_lower)
             cmu_count = _count_syllables_cmu(part_lower)
 
-            # Voting logic: use majority consensus
-            counts = []
-            if pyphen_count > 0:
-                counts.append(pyphen_count)
-            if syllables_count > 0:
-                counts.append(syllables_count)
-            if cmu_count > 0:
-                counts.append(cmu_count)
-
-            if len(counts) == 0:
+            # Voting logic: use majority consensus, with intelligent tie-breaking
+            # Priority order when no majority: CMU > pyphen > syllables library
+            if cmu_count == 0 and pyphen_count == 0 and syllables_count == 0:
                 # No library could count, use heuristic
                 word_count = _count_syllables_heuristic(part_lower)
-            elif len(counts) == 1:
-                # Only one library returned a count, trust it
-                word_count = counts[0]
-            else:
-                # Multiple libraries returned counts - use majority vote
+            elif cmu_count > 0 and pyphen_count > 0 and syllables_count > 0:
+                # All 3 returned counts - check for majority
+                counts = [cmu_count, pyphen_count, syllables_count]
                 count_freq = Counter(counts)
-                # Get the most common count (majority vote)
-                word_count = count_freq.most_common(1)[0][0]
+                most_common_count, frequency = count_freq.most_common(1)[0]
+
+                if frequency >= 2:
+                    # We have a majority (2 or 3 agree)
+                    word_count = most_common_count
+                else:
+                    # All 3 disagree - prefer CMU dict (most accurate)
+                    word_count = cmu_count
+            elif cmu_count > 0 and pyphen_count > 0:
+                # CMU and pyphen available - prefer agreement, fallback to CMU
+                if cmu_count == pyphen_count:
+                    word_count = cmu_count
+                else:
+                    word_count = cmu_count  # Prefer CMU when they disagree
+            elif cmu_count > 0:
+                # Only CMU available
+                word_count = cmu_count
+            elif pyphen_count > 0:
+                # Only pyphen available
+                word_count = pyphen_count
+            else:
+                # Only syllables library available
+                word_count = syllables_count
 
             total += word_count
 

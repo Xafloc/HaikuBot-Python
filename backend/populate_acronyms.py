@@ -14,17 +14,15 @@ from backend.config import load_config
 # Common internet acronyms and their syllable counts
 # Format: (acronym, syllable_count, description)
 COMMON_ACRONYMS = [
-    # 2 letters
+    # 2 letters - NOTE: ok removed because it's a common English word
     ("gg", 2, "good game"),
     ("wp", 2, "well played"),
     ("gl", 2, "good luck"),
     ("hf", 2, "have fun"),
-    ("gg", 2, "good game"),
     ("ty", 2, "thank you"),
     ("np", 2, "no problem"),
     ("nm", 2, "not much / nevermind"),
     ("ic", 2, "I see"),
-    ("ok", 2, "okay"),
 
     # 3 letters (usually 3 syllables when pronounced as letters)
     ("lol", 3, "laugh out loud"),
@@ -98,9 +96,7 @@ COMMON_ACRONYMS = [
     ("pong", 1, "ping response"),
     ("ctcp", 4, "client-to-client protocol"),
 
-    # Time/date
-    ("am", 2, "ante meridiem"),
-    ("pm", 2, "post meridiem"),
+    # Time/date - NOTE: am/pm/ok removed because they're common English words
     ("est", 3, "eastern standard time"),
     ("pst", 3, "pacific standard time"),
     ("utc", 3, "coordinated universal time"),
