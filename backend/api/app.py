@@ -10,6 +10,7 @@ from pathlib import Path
 from ..config import Config
 from .routes import router
 from .websocket import websocket_router
+from .admin_routes import router as admin_router
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ def create_app(config: Config) -> FastAPI:
     
     # Include routers
     app.include_router(router, prefix="/api")
+    app.include_router(admin_router, prefix="/api")
     app.include_router(websocket_router)
 
     # Serve frontend static files if they exist

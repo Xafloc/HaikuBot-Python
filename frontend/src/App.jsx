@@ -5,6 +5,7 @@ import Browse from './pages/Browse'
 import BrowseLines from './pages/BrowseLines'
 import Statistics from './pages/Statistics'
 import UserProfile from './pages/UserProfile'
+import Admin from './pages/Admin'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/lines" element={<BrowseLines />} />
           <Route path="/stats" element={<Statistics />} />
           <Route path="/user/:username" element={<UserProfile />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
       <footer className="mt-16 py-8 bg-gray-800 text-white">

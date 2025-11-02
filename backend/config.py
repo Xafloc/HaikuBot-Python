@@ -42,6 +42,12 @@ class WebConfig(BaseModel):
     cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
 
+class AdminConfig(BaseModel):
+    """Admin panel configuration."""
+    username: str = "admin"
+    password: str = "changeme"
+
+
 class LoggingConfig(BaseModel):
     """Logging configuration."""
     level: str = "INFO"
@@ -55,6 +61,7 @@ class Config(BaseModel):
     servers: List[ServerConfig]
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     web: WebConfig = Field(default_factory=WebConfig)
+    admin: AdminConfig = Field(default_factory=AdminConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
