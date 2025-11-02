@@ -4,15 +4,15 @@ After=network.target
 
 [Service]
 Type=simple
-User=haikubot
-Group=haikubot
-WorkingDirectory=/opt/haikubot
-Environment="PATH=/opt/haikubot/venv/bin"
-ExecStart=/opt/haikubot/venv/bin/python -m backend.main --config /opt/haikubot/config.yaml
+User=darren
+Group=darren
+WorkingDirectory=/opt/Scripts/HaikuBot-Python
+Environment="PATH=/opt/Scripts/HaikuBot-Python/venv/bin"
+ExecStart=/opt/Scripts/HaikuBot-Python/venv/bin/python -m backend.main --config /opt/Scripts/HaikuBot-Python/config.yaml
 Restart=on-failure
 RestartSec=10
-StandardOutput=append:/var/log/haikubot/output.log
-StandardError=append:/var/log/haikubot/error.log
+StandardOutput=append:/opt/Scripts/HaikuBot-Python/haikubot.log
+StandardError=append:/opt/Scripts/HaikuBot-Python/haikubot-error.log
 
 [Install]
 WantedBy=multi-user.target
