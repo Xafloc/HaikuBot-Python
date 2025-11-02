@@ -8,9 +8,11 @@ function BrowseLines() {
     username: '',
   });
   const [page, setPage] = useState(0);
+  const [sortBy, setSortBy] = useState('timestamp');
+  const [sortOrder, setSortOrder] = useState('desc');
   const limit = 50;
 
-  const { data: lines, isLoading } = useQuery({
+  const { data: rawLines, isLoading } = useQuery({
     queryKey: ['lines', { ...filters, skip: page * limit, limit }],
     queryFn: () =>
       fetchLines({
@@ -21,6 +23,27 @@ function BrowseLines() {
       }),
   });
 
+  // Client-side sorting
+  const lines = rawLines ? [...rawLines].sort((a, b) => {
+    let aVal = a[sortBy];
+    let bVal = b[sortBy];
+
+    // Handle different data types
+    if (sortBy === 'timestamp') {
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
+    } else if (typeof aVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+
+    if (sortOrder === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  }) : [];
+
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(0); // Reset to first page on filter change
@@ -29,6 +52,29 @@ function BrowseLines() {
   const clearFilters = () => {
     setFilters({ syllable_count: '', username: '' });
     setPage(0);
+  };
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      // Toggle sort order if clicking the same column
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new column and default to descending
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+    setPage(0); // Reset to first page
+  };
+
+  const SortIcon = ({ column }) => {
+    if (sortBy !== column) {
+      return <span className="ml-1 text-gray-400">⇅</span>;
+    }
+    return sortOrder === 'asc' ? (
+      <span className="ml-1">↑</span>
+    ) : (
+      <span className="ml-1">↓</span>
+    );
   };
 
   const formatDate = (timestamp) => {
@@ -114,26 +160,44 @@ function BrowseLines() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID
+                    <th
+                      onClick={() => handleSort('id')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    >
+                      ID <SortIcon column="id" />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Text
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Syllables
+                    <th
+                      onClick={() => handleSort('syllable_count')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    >
+                      Syllables <SortIcon column="syllable_count" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      User
+                    <th
+                      onClick={() => handleSort('username')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    >
+                      User <SortIcon column="username" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Channel
+                    <th
+                      onClick={() => handleSort('channel')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    >
+                      Channel <SortIcon column="channel" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Source
+                    <th
+                      onClick={() => handleSort('source')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    >
+                      Source <SortIcon column="source" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                    <th
+                      onClick={() => handleSort('timestamp')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    >
+                      Date <SortIcon column="timestamp" />
                     </th>
                   </tr>
                 </thead>

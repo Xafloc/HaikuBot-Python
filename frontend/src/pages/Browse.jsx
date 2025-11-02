@@ -11,9 +11,10 @@ function Browse() {
     username: '',
   });
   const [page, setPage] = useState(0);
+  const [sortOrder, setSortOrder] = useState('desc'); // desc = newest first, asc = oldest first
   const limit = 20;
 
-  const { data: haikus, isLoading } = useQuery({
+  const { data: rawHaikus, isLoading } = useQuery({
     queryKey: ['haikus', { ...filters, skip: page * limit, limit }],
     queryFn: () =>
       fetchHaikus({
@@ -22,6 +23,18 @@ function Browse() {
         limit,
       }),
   });
+
+  // Client-side sorting by date
+  const haikus = rawHaikus ? [...rawHaikus].sort((a, b) => {
+    const aTime = new Date(a.generated_at).getTime();
+    const bTime = new Date(b.generated_at).getTime();
+
+    if (sortOrder === 'asc') {
+      return aTime - bTime; // oldest first
+    } else {
+      return bTime - aTime; // newest first
+    }
+  }) : [];
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -39,8 +52,8 @@ function Browse() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Filters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-lg font-semibold mb-4">Filters & Sorting</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Server
@@ -76,6 +89,22 @@ function Browse() {
               placeholder="e.g., Alice"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-haiku-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sort By
+            </label>
+            <select
+              value={sortOrder}
+              onChange={(e) => {
+                setSortOrder(e.target.value);
+                setPage(0);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-haiku-500"
+            >
+              <option value="desc">Newest First</option>
+              <option value="asc">Oldest First</option>
+            </select>
           </div>
         </div>
         {(filters.server || filters.channel || filters.username) && (
