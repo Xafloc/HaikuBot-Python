@@ -34,6 +34,10 @@ web:
     - "http://localhost:5173"  # Vite dev server
     - "http://localhost:8000"  # Production
 
+admin:
+  username: "admin"  # Admin panel username
+  password: "changeme"  # Admin panel password - CHANGE THIS!
+
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR
   file: "./haikubot.log"  # Log file path
