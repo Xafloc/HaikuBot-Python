@@ -27,7 +27,23 @@ def test_word(word):
     except:
         pyph_count = 0
 
-    print(f"  '{word}': syllables_lib={syl_count}, pyphen={pyph_count} (hyphenated: {hyphenator.inserted(clean)})")
+    # Test CMU/pronouncing
+    import pronouncing
+    try:
+        phones = pronouncing.phones_for_word(clean)
+        cmu_count = pronouncing.syllable_count(phones[0]) if phones else 0
+    except:
+        cmu_count = 0
+
+    # Determine voting result
+    counts = [c for c in [pyph_count, syl_count, cmu_count] if c > 0]
+    if counts:
+        from collections import Counter
+        vote = Counter(counts).most_common(1)[0][0]
+    else:
+        vote = "?"
+
+    print(f"  '{word}': syllables={syl_count}, pyphen={pyph_count}, cmu={cmu_count} → VOTE={vote}")
 
 def test_phrase(phrase):
     """Test a full phrase."""

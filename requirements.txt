@@ -13,6 +13,7 @@ jaraco.stream==3.0.3
 # Syllable Detection
 pyphen==0.14.0
 syllables==1.0.7
+pronouncing==0.2.0
 
 # Configuration
 PyYAML==6.0.1

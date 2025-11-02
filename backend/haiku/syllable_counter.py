@@ -1,10 +1,12 @@
-"""Syllable counting using multiple methods for accuracy."""
+"""Syllable counting using multiple methods with voting for accuracy."""
 
 import re
 import logging
 from typing import Optional
+from collections import Counter
 import pyphen
 from syllables import estimate as syllables_estimate
+import pronouncing
 
 logger = logging.getLogger(__name__)
 
@@ -45,24 +47,37 @@ def count_syllables(text: str) -> int:
         if not word:
             continue
 
-        # Try both methods
+        # Try all three methods
         syllables_count = _count_syllables_library(word)
         pyphen_count = _count_syllables_pyphen(word)
+        cmu_count = _count_syllables_cmu(word)
 
-        # Use pyphen first (more accurate for common words like "going", "earlier")
-        # Fall back to syllables library, then heuristic
+        # Voting logic: use majority consensus
+        counts = []
         if pyphen_count > 0:
-            word_count = pyphen_count
-        elif syllables_count > 0:
-            word_count = syllables_count
-        else:
-            # Fallback to heuristic method
+            counts.append(pyphen_count)
+        if syllables_count > 0:
+            counts.append(syllables_count)
+        if cmu_count > 0:
+            counts.append(cmu_count)
+
+        if len(counts) == 0:
+            # No library could count, use heuristic
             word_count = _count_syllables_heuristic(word)
+        elif len(counts) == 1:
+            # Only one library returned a count, trust it
+            word_count = counts[0]
+        else:
+            # Multiple libraries returned counts - use majority vote
+            count_freq = Counter(counts)
+            # Get the most common count (majority vote)
+            # If all disagree, prefer pyphen or CMU (both reliable)
+            word_count = count_freq.most_common(1)[0][0]
 
         total += word_count
 
         logger.debug(f"Word: '{word}' -> syllables={syllables_count}, "
-                    f"pyphen={pyphen_count}, chosen={word_count}")
+                    f"pyphen={pyphen_count}, cmu={cmu_count}, chosen={word_count}")
     
     return total
 
@@ -89,10 +104,10 @@ def _count_syllables_pyphen(word: str) -> int:
 
 def _count_syllables_library(word: str) -> int:
     """Count syllables using syllables library.
-    
+
     Args:
         word: Single word
-        
+
     Returns:
         Syllable count (0 if unable to determine)
     """
@@ -101,7 +116,29 @@ def _count_syllables_library(word: str) -> int:
         return max(0, count)
     except Exception as e:
         logger.debug(f"syllables library failed for '{word}': {e}")
-    
+
+    return 0
+
+
+def _count_syllables_cmu(word: str) -> int:
+    """Count syllables using CMU Pronouncing Dictionary.
+
+    Args:
+        word: Single word
+
+    Returns:
+        Syllable count (0 if unable to determine)
+    """
+    try:
+        # Get phonetic representations for the word
+        phones = pronouncing.phones_for_word(word.lower())
+        if phones:
+            # Use the first pronunciation
+            # CMU dict counts syllables by stress markers on vowels
+            return pronouncing.syllable_count(phones[0])
+    except Exception as e:
+        logger.debug(f"CMU dict failed for '{word}': {e}")
+
     return 0
 
 
