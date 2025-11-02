@@ -43,8 +43,8 @@ A modern IRC bot that monitors conversations across multiple servers, automatica
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/haikubot.git
-cd haikubot
+git clone https://github.com/Xafloc/HaikuBot-Python.git
+cd HaikuBot-Python
 ```
 
 2. **Set up Python environment:**
