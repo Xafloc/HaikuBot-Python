@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = '/api';
 
 function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
