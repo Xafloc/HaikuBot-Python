@@ -139,11 +139,11 @@ class User(Base):
 
 class Server(Base):
     """IRC server configuration.
-    
+
     Mirrors config.yaml but stored in DB for runtime management.
     """
     __tablename__ = "servers"
-    
+
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
     host = Column(String(200), nullable=False)
@@ -153,7 +153,30 @@ class Server(Base):
     password = Column(String(200), nullable=True)
     channels = Column(Text, nullable=False)  # JSON array as string
     enabled = Column(Boolean, default=True)
-    
+
     def __repr__(self):
         return f"<Server(name='{self.name}', host='{self.host}')>"
+
+
+class Acronym(Base):
+    """Known acronyms and their syllable counts.
+
+    Used to properly count syllables for internet slang and abbreviations.
+    When an acronym is pronounced letter-by-letter (e.g., 'irl' = 'i-r-l'),
+    the syllable count is usually the number of letters.
+    """
+    __tablename__ = "acronyms"
+
+    id = Column(Integer, primary_key=True)
+    acronym = Column(String(20), unique=True, nullable=False)
+    syllable_count = Column(Integer, nullable=False)
+    description = Column(Text, nullable=True)  # Optional: what it stands for
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_acronym', 'acronym'),
+    )
+
+    def __repr__(self):
+        return f"<Acronym(acronym='{self.acronym}', syllables={self.syllable_count})>"
 

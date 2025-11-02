@@ -2,7 +2,7 @@
 
 import re
 import logging
-from typing import Optional
+from typing import Optional, List
 from collections import Counter
 import pyphen
 from syllables import estimate as syllables_estimate
@@ -13,72 +13,174 @@ logger = logging.getLogger(__name__)
 # Initialize pyphen dictionary for English
 _hyphenator = pyphen.Pyphen(lang='en_US')
 
+# Acronym cache - loaded on first use
+_acronym_cache: Optional[dict] = None
+
+
+def _load_acronym_cache() -> dict:
+    """Load acronyms from database into memory cache.
+
+    Returns:
+        Dictionary mapping acronym to syllable count
+    """
+    global _acronym_cache
+
+    if _acronym_cache is not None:
+        return _acronym_cache
+
+    _acronym_cache = {}
+
+    try:
+        from ..database import get_session, Acronym
+
+        with get_session() as session:
+            acronyms = session.query(Acronym).all()
+            for acronym in acronyms:
+                _acronym_cache[acronym.acronym.lower()] = acronym.syllable_count
+
+        logger.info(f"Loaded {len(_acronym_cache)} acronyms into cache")
+    except Exception as e:
+        logger.warning(f"Failed to load acronym cache: {e}")
+        _acronym_cache = {}
+
+    return _acronym_cache
+
+
+def _check_acronym(word: str) -> int:
+    """Check if word is a known acronym and return syllable count.
+
+    Args:
+        word: Single word to check
+
+    Returns:
+        Syllable count if found in acronym database, 0 otherwise
+    """
+    cache = _load_acronym_cache()
+    return cache.get(word.lower(), 0)
+
+
+def _split_camelcase(word: str) -> List[str]:
+    """Split CamelCase word into separate words.
+
+    Examples:
+        "EvilB" -> ["Evil", "B"]
+        "DarkScience" -> ["Dark", "Science"]
+        "hello" -> ["hello"] (no change)
+
+    Args:
+        word: Word that might be in CamelCase
+
+    Returns:
+        List of words after splitting
+    """
+    # Match pattern: lowercase followed by uppercase, or uppercase followed by uppercase+lowercase
+    # This handles both "evilB" and "EvilB" and "XMLParser" patterns
+    parts = re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\b)', word)
+
+    if not parts:
+        # No CamelCase detected, return original word
+        return [word]
+
+    # Check if we actually split anything
+    joined = ''.join(parts)
+    if joined.lower() == word.lower() and len(parts) > 1:
+        # Successfully split CamelCase
+        logger.debug(f"Split CamelCase: '{word}' -> {parts}")
+        return parts
+
+    # No split occurred, return original
+    return [word]
+
 
 def count_syllables(text: str) -> int:
     """Count syllables in text using multiple methods.
-    
-    Uses both pyphen (hyphenation-based) and syllables library,
-    with fallback heuristics for edge cases.
-    
+
+    Process:
+    1. Check if word is a known acronym (from database)
+    2. Split CamelCase words (e.g., "EvilB" -> "Evil" + "B")
+    3. Use 3-way voting (pyphen, syllables, CMU dict) for accuracy
+    4. Fallback to heuristic if all methods fail
+
     Args:
         text: Text to count syllables in
-        
+
     Returns:
         Total syllable count
     """
     if not text or not text.strip():
         return 0
-    
-    # Clean and normalize text
-    text = text.strip().lower()
+
+    # Clean and normalize text - but preserve original case for CamelCase detection
+    text = text.strip()
 
     # Remove punctuation but keep spaces and hyphens (for compound words)
-    text = re.sub(r'[^\w\s\-]', '', text)
+    # Keep original case for now
+    cleaned = re.sub(r'[^\w\s\-]', '', text)
 
     # Split into words (split on spaces and hyphens)
-    words = re.split(r'[\s\-]+', text)
-    
+    words = re.split(r'[\s\-]+', cleaned)
+
     if not words:
         return 0
-    
+
     total = 0
-    
+
     for word in words:
         if not word:
             continue
 
-        # Try all three methods
-        syllables_count = _count_syllables_library(word)
-        pyphen_count = _count_syllables_pyphen(word)
-        cmu_count = _count_syllables_cmu(word)
+        # Priority 1: Check if it's a known acronym
+        acronym_count = _check_acronym(word)
+        if acronym_count > 0:
+            total += acronym_count
+            logger.debug(f"Word: '{word}' -> acronym={acronym_count}")
+            continue
 
-        # Voting logic: use majority consensus
-        counts = []
-        if pyphen_count > 0:
-            counts.append(pyphen_count)
-        if syllables_count > 0:
-            counts.append(syllables_count)
-        if cmu_count > 0:
-            counts.append(cmu_count)
+        # Priority 2: Try to split CamelCase
+        parts = _split_camelcase(word)
 
-        if len(counts) == 0:
-            # No library could count, use heuristic
-            word_count = _count_syllables_heuristic(word)
-        elif len(counts) == 1:
-            # Only one library returned a count, trust it
-            word_count = counts[0]
-        else:
-            # Multiple libraries returned counts - use majority vote
-            count_freq = Counter(counts)
-            # Get the most common count (majority vote)
-            # If all disagree, prefer pyphen or CMU (both reliable)
-            word_count = count_freq.most_common(1)[0][0]
+        # Process each part (will be single word if no CamelCase)
+        for part in parts:
+            part_lower = part.lower()
 
-        total += word_count
+            # Check if part is an acronym (e.g., "B" in "EvilB")
+            acronym_count = _check_acronym(part_lower)
+            if acronym_count > 0:
+                total += acronym_count
+                logger.debug(f"Part: '{part}' -> acronym={acronym_count}")
+                continue
 
-        logger.debug(f"Word: '{word}' -> syllables={syllables_count}, "
-                    f"pyphen={pyphen_count}, cmu={cmu_count}, chosen={word_count}")
-    
+            # Try all three syllable counting methods
+            syllables_count = _count_syllables_library(part_lower)
+            pyphen_count = _count_syllables_pyphen(part_lower)
+            cmu_count = _count_syllables_cmu(part_lower)
+
+            # Voting logic: use majority consensus
+            counts = []
+            if pyphen_count > 0:
+                counts.append(pyphen_count)
+            if syllables_count > 0:
+                counts.append(syllables_count)
+            if cmu_count > 0:
+                counts.append(cmu_count)
+
+            if len(counts) == 0:
+                # No library could count, use heuristic
+                word_count = _count_syllables_heuristic(part_lower)
+            elif len(counts) == 1:
+                # Only one library returned a count, trust it
+                word_count = counts[0]
+            else:
+                # Multiple libraries returned counts - use majority vote
+                count_freq = Counter(counts)
+                # Get the most common count (majority vote)
+                word_count = count_freq.most_common(1)[0][0]
+
+            total += word_count
+
+            logger.debug(f"Part: '{part}' -> syllables={syllables_count}, "
+                        f"pyphen={pyphen_count}, cmu={cmu_count}, chosen={word_count}")
+
     return total
 
 
