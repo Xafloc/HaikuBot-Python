@@ -43,7 +43,8 @@ class HaikuBot(irc.bot.SingleServerIRCBot):
         # Configure SSL if needed
         connect_factory = irc.connection.Factory()
         if server_config.ssl:
-            connect_factory = irc.connection.Factory(wrapper=ssl.wrap_socket)
+            ssl_context = ssl.create_default_context()
+            connect_factory = irc.connection.Factory(wrapper=ssl_context.wrap_socket)
 
         # Initialize parent
         super().__init__(
