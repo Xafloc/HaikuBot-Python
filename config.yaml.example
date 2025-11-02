@@ -1,0 +1,40 @@
+database:
+  path: "./haiku.db"
+
+bot:
+  owner: "YourNickname"  # Your IRC nickname (admin access)
+  web_url: "http://localhost:8000"  # Public URL for the web interface
+  trigger_prefix: "!"  # Command prefix (e.g., !haiku)
+
+servers:
+  - name: "libera"
+    host: "irc.libera.chat"
+    port: 6697
+    ssl: true
+    nick: "HaikuBot"
+    password: ""  # Leave empty if no password needed
+    channels: ["#haiku", "#bots"]
+    
+  # - name: "darkscience"
+  #   host: "irc.darkscience.net"
+  #   port: 6697
+  #   ssl: true
+  #   nick: "HaikuBot"
+  #   password: ""
+  #   channels: ["#haiku"]
+
+features:
+  auto_collect: true  # Automatically collect 5/7 syllable messages
+  allow_manual_submission: true  # Allow editors to manually submit lines
+
+web:
+  host: "0.0.0.0"  # Bind to all interfaces
+  port: 8000  # Web server port
+  cors_origins:  # CORS origins for frontend development
+    - "http://localhost:5173"  # Vite dev server
+    - "http://localhost:8000"  # Production
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "./haikubot.log"  # Log file path
+

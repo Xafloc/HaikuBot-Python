@@ -1,0 +1,19 @@
+[Unit]
+Description=HaikuBot IRC Haiku Generator
+After=network.target
+
+[Service]
+Type=simple
+User=haikubot
+Group=haikubot
+WorkingDirectory=/opt/haikubot
+Environment="PATH=/opt/haikubot/venv/bin"
+ExecStart=/opt/haikubot/venv/bin/python -m backend.main --config /opt/haikubot/config.yaml
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/haikubot/output.log
+StandardError=append:/var/log/haikubot/error.log
+
+[Install]
+WantedBy=multi-user.target
+

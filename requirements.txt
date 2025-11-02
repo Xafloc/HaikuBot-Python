@@ -1,0 +1,25 @@
+# Core Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# IRC Client
+irc==20.3.1
+jaraco.stream==3.0.3
+
+# Syllable Detection
+pyphen==0.14.0
+syllables==1.0.7
+
+# Configuration
+PyYAML==6.0.1
+
+# WebSocket
+websockets==12.0
+
+# Utilities
+python-dateutil==2.8.2
+

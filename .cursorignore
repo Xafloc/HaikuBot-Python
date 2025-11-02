@@ -1,0 +1,12 @@
+# Ignore these files/directories for Cursor indexing
+node_modules/
+venv/
+*.db
+*.sqlite
+*.log
+frontend/dist/
+frontend/build/
+__pycache__/
+*.pyc
+.git/
+
