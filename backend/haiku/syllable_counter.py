@@ -45,17 +45,16 @@ def count_syllables(text: str) -> int:
         if not word:
             continue
 
-        # Try syllables library first (most accurate)
+        # Try both methods
         syllables_count = _count_syllables_library(word)
-
-        # Try pyphen as backup
         pyphen_count = _count_syllables_pyphen(word)
 
-        # Use syllables library if available, otherwise use pyphen, then heuristic
-        if syllables_count > 0:
-            word_count = syllables_count
-        elif pyphen_count > 0:
+        # Use pyphen first (more accurate for common words like "going", "earlier")
+        # Fall back to syllables library, then heuristic
+        if pyphen_count > 0:
             word_count = pyphen_count
+        elif syllables_count > 0:
+            word_count = syllables_count
         else:
             # Fallback to heuristic method
             word_count = _count_syllables_heuristic(word)
