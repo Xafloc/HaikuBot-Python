@@ -45,6 +45,7 @@ class SyllableCheckResult(BaseModel):
     username: str
     channel: str
     timestamp: str
+    method: str  # Which counting method was used
 
 
 # Simple authentication (just checks credentials from config)
@@ -224,9 +225,15 @@ def delete_haiku(
 def check_syllables(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    method: str = "perl",
     _authenticated: bool = Depends(verify_admin_token)
 ) -> List[SyllableCheckResult]:
     """Check syllable counts for lines in date range.
+
+    Args:
+        start_date: Optional start date filter (ISO format)
+        end_date: Optional end date filter (ISO format)
+        method: Syllable counting method - "perl" (most accurate) or "python"
 
     Returns lines where stored syllable count doesn't match actual count.
     """
@@ -253,7 +260,7 @@ def check_syllables(
         # Check each line
         results = []
         for line in lines:
-            actual_count = count_syllables(line.text)
+            actual_count = count_syllables(line.text, method=method)
 
             # Only include if counts don't match
             if actual_count != line.syllable_count:
@@ -265,7 +272,8 @@ def check_syllables(
                     matches=False,
                     username=line.username,
                     channel=line.channel,
-                    timestamp=line.timestamp.isoformat()
+                    timestamp=line.timestamp.isoformat(),
+                    method=method
                 ))
 
         return results

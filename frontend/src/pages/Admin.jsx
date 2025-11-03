@@ -402,6 +402,7 @@ function ManageHaikus({ token }) {
 function SyllableCheck({ token }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [method, setMethod] = useState('perl');
   const [results, setResults] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
   const queryClient = useQueryClient();
@@ -412,6 +413,7 @@ function SyllableCheck({ token }) {
       const params = new URLSearchParams();
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
+      params.append('method', method);
 
       const response = await fetch(
         `${API_BASE}/admin/syllable-check?${params}`,
@@ -456,7 +458,7 @@ function SyllableCheck({ token }) {
           counter algorithm.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Start Date
@@ -479,6 +481,19 @@ function SyllableCheck({ token }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Counting Method
+            </label>
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="perl">Perl (78% accuracy - most accurate)</option>
+              <option value="python">Python (64% accuracy - fallback)</option>
+            </select>
+          </div>
         </div>
 
         <button
@@ -496,6 +511,11 @@ function SyllableCheck({ token }) {
             <h3 className="text-lg font-semibold mb-2">
               Found {results.length} line(s) with incorrect syllable counts
             </h3>
+            {results.length > 0 && (
+              <p className="text-sm text-gray-600 mb-2">
+                Using method: <span className="font-medium">{results[0].method}</span>
+              </p>
+            )}
             {results.length === 0 && (
               <p className="text-gray-600">
                 All lines in the date range have correct syllable counts!

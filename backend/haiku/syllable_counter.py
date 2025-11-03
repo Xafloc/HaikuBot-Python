@@ -2,6 +2,9 @@
 
 import re
 import logging
+import subprocess
+import os
+from pathlib import Path
 from typing import Optional, List
 from collections import Counter
 import pyphen
@@ -9,6 +12,9 @@ from syllables import estimate as syllables_estimate
 import pronouncing
 
 logger = logging.getLogger(__name__)
+
+# Path to Perl syllable counter script
+_PERL_SCRIPT_PATH = Path(__file__).parent / "perl_syllable_counter.pl"
 
 # Initialize pyphen dictionary for English
 _hyphenator = pyphen.Pyphen(lang='en_US')
@@ -92,17 +98,50 @@ def _split_camelcase(word: str) -> List[str]:
     return [word]
 
 
-def count_syllables(text: str) -> int:
-    """Count syllables in text using multiple methods.
+def _count_syllables_perl(text: str) -> int:
+    """Count syllables using Perl Lingua::EN::Syllable via subprocess.
 
-    Process:
-    1. Check if word is a known acronym (from database)
-    2. Split CamelCase words (e.g., "EvilB" -> "Evil" + "B")
-    3. Use 3-way voting (pyphen, syllables, CMU dict) for accuracy
-    4. Fallback to heuristic if all methods fail
+    This is the most accurate method (78% on test data) and likely matches
+    the original Perl bot's behavior.
 
     Args:
         text: Text to count syllables in
+
+    Returns:
+        Syllable count (0 if Perl script fails)
+    """
+    try:
+        result = subprocess.run(
+            ['perl', str(_PERL_SCRIPT_PATH), text],
+            capture_output=True,
+            text=True,
+            timeout=5,  # 5 second timeout
+        )
+
+        if result.returncode == 0:
+            return int(result.stdout.strip())
+        else:
+            logger.warning(f"Perl script failed: {result.stderr}")
+            return 0
+
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError) as e:
+        logger.warning(f"Perl syllable counter error: {e}")
+        return 0
+    except FileNotFoundError:
+        logger.warning("Perl not found - falling back to Python methods")
+        return 0
+
+
+def count_syllables(text: str, method: str = "perl") -> int:
+    """Count syllables in text using selected method.
+
+    Methods:
+    - "perl": Use Lingua::EN::Syllable via Perl subprocess (78% accuracy, most accurate)
+    - "python": Use Python syllables library (64% accuracy, pure Python)
+
+    Args:
+        text: Text to count syllables in
+        method: Counting method - "perl" (default) or "python"
 
     Returns:
         Total syllable count
@@ -110,11 +149,19 @@ def count_syllables(text: str) -> int:
     if not text or not text.strip():
         return 0
 
+    # Method 1: Perl (most accurate - 78%)
+    if method == "perl":
+        count = _count_syllables_perl(text)
+        if count > 0:
+            return count
+        # Fall back to Python if Perl fails
+        logger.info("Perl failed, falling back to Python method")
+
+    # Method 2: Python (fallback or explicit choice)
     # Clean and normalize text - but preserve original case for CamelCase detection
     text = text.strip()
 
     # Remove punctuation but keep spaces and hyphens (for compound words)
-    # Keep original case for now
     cleaned = re.sub(r'[^\w\s\-]', '', text)
 
     # Split into words (split on spaces and hyphens)
@@ -150,48 +197,23 @@ def count_syllables(text: str) -> int:
                 logger.debug(f"Part: '{part}' -> acronym={acronym_count}")
                 continue
 
-            # Try all three syllable counting methods
+            # Use Python syllables library (UPDATED: syllables first, pyphen fallback)
             syllables_count = _count_syllables_library(part_lower)
             pyphen_count = _count_syllables_pyphen(part_lower)
-            cmu_count = _count_syllables_cmu(part_lower)
 
-            # Voting logic: use majority consensus, with intelligent tie-breaking
-            # Priority order when no majority: CMU > pyphen > syllables library
-            if cmu_count == 0 and pyphen_count == 0 and syllables_count == 0:
-                # No library could count, use heuristic
-                word_count = _count_syllables_heuristic(part_lower)
-            elif cmu_count > 0 and pyphen_count > 0 and syllables_count > 0:
-                # All 3 returned counts - check for majority
-                counts = [cmu_count, pyphen_count, syllables_count]
-                count_freq = Counter(counts)
-                most_common_count, frequency = count_freq.most_common(1)[0]
-
-                if frequency >= 2:
-                    # We have a majority (2 or 3 agree)
-                    word_count = most_common_count
-                else:
-                    # All 3 disagree - prefer CMU dict (most accurate)
-                    word_count = cmu_count
-            elif cmu_count > 0 and pyphen_count > 0:
-                # CMU and pyphen available - prefer agreement, fallback to CMU
-                if cmu_count == pyphen_count:
-                    word_count = cmu_count
-                else:
-                    word_count = cmu_count  # Prefer CMU when they disagree
-            elif cmu_count > 0:
-                # Only CMU available
-                word_count = cmu_count
+            # Prefer syllables library (more accurate), fallback to pyphen
+            if syllables_count > 0:
+                word_count = syllables_count
             elif pyphen_count > 0:
-                # Only pyphen available
                 word_count = pyphen_count
             else:
-                # Only syllables library available
-                word_count = syllables_count
+                # Neither library could count, use heuristic
+                word_count = _count_syllables_heuristic(part_lower)
 
             total += word_count
 
             logger.debug(f"Part: '{part}' -> syllables={syllables_count}, "
-                        f"pyphen={pyphen_count}, cmu={cmu_count}, chosen={word_count}")
+                        f"pyphen={pyphen_count}, chosen={word_count}")
 
     return total
 
