@@ -192,6 +192,7 @@ function ManageLines({ token }) {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ lineId, cascade = false }) => {
+      console.log('[CASCADE DELETE v2] Deleting line:', lineId, 'cascade:', cascade);
       const url = cascade
         ? `${API_BASE}/admin/lines/${lineId}?cascade=true`
         : `${API_BASE}/admin/lines/${lineId}`;
