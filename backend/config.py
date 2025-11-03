@@ -25,6 +25,7 @@ class ServerConfig(BaseModel):
     port: int = 6667
     ssl: bool = False
     nick: str = "HaikuBot"
+    realname: str = "HaikuBot - Randomly generated haiku from IRC chat"
     password: str = ""
     channels: List[str] = Field(default_factory=list)
 

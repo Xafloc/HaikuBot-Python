@@ -53,7 +53,7 @@ class HaikuBot(irc.bot.SingleServerIRCBot):
         super().__init__(
             [server_spec],
             server_config.nick,
-            server_config.nick,
+            server_config.realname,
             connect_factory=connect_factory
         )
         
