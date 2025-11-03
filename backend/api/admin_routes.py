@@ -148,21 +148,57 @@ def list_lines(
 @router.delete("/lines/{line_id}")
 def delete_line(
     line_id: int,
+    cascade: bool = False,
     _authenticated: bool = Depends(verify_admin_token)
 ) -> dict:
-    """Delete a line by ID."""
+    """Delete a line by ID.
+
+    Args:
+        line_id: ID of line to delete
+        cascade: If True, also delete all haikus using this line
+    """
     with get_session() as session:
         line = session.query(Line).filter(Line.id == line_id).first()
 
         if not line:
             raise HTTPException(status_code=404, detail="Line not found")
 
+        # Check if line is used in any haikus
+        haikus_using_line = session.query(GeneratedHaiku).filter(
+            (GeneratedHaiku.line1_id == line_id) |
+            (GeneratedHaiku.line2_id == line_id) |
+            (GeneratedHaiku.line3_id == line_id)
+        ).all()
+
+        if haikus_using_line and not cascade:
+            # Return error with details about haikus using this line
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "Line is used in haikus",
+                    "message": f"This line is used in {len(haikus_using_line)} haiku(s)",
+                    "haiku_count": len(haikus_using_line),
+                    "haiku_ids": [h.id for h in haikus_using_line],
+                    "line_text": line.text
+                }
+            )
+
+        # If cascade, delete all haikus using this line first
+        if cascade and haikus_using_line:
+            for haiku in haikus_using_line:
+                session.delete(haiku)
+            logger.info(f"Admin cascade deleted {len(haikus_using_line)} haiku(s) using line {line_id}")
+
         session.delete(line)
         session.commit()
 
         logger.info(f"Admin deleted line {line_id}: {line.text}")
 
-        return {"success": True, "message": f"Deleted line {line_id}"}
+        return {
+            "success": True,
+            "message": f"Deleted line {line_id}",
+            "cascade_deleted_haikus": len(haikus_using_line) if cascade else 0
+        }
 
 
 @router.patch("/lines/{line_id}")

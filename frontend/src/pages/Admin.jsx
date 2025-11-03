@@ -191,17 +191,45 @@ function ManageLines({ token }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (lineId) => {
-      const response = await fetch(`${API_BASE}/admin/lines/${lineId}`, {
+    mutationFn: async ({ lineId, cascade = false }) => {
+      const url = cascade
+        ? `${API_BASE}/admin/lines/${lineId}?cascade=true`
+        : `${API_BASE}/admin/lines/${lineId}`;
+
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) throw new Error('Failed to delete line');
+      if (!response.ok) {
+        if (response.status === 409) {
+          // Line is used in haikus
+          const errorData = await response.json();
+          throw { status: 409, data: errorData.detail };
+        }
+        throw new Error('Failed to delete line');
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['admin-lines']);
+    },
+    onError: (error, variables) => {
+      if (error.status === 409) {
+        // Show dialog asking if user wants to cascade delete
+        const haikuCount = error.data.haiku_count;
+        const lineText = error.data.line_text;
+        if (
+          confirm(
+            `This line is used in ${haikuCount} haiku(s):\n\n"${lineText}"\n\nDo you want to delete the line AND all ${haikuCount} haiku(s) that use it?`
+          )
+        ) {
+          // Retry with cascade=true
+          deleteMutation.mutate({ lineId: variables.lineId, cascade: true });
+        }
+      } else {
+        alert('Error deleting line: ' + error.message);
+      }
     },
   });
 
@@ -284,7 +312,7 @@ function ManageLines({ token }) {
                     <button
                       onClick={() => {
                         if (confirm(`Delete line: "${line.text}"?`)) {
-                          deleteMutation.mutate(line.id);
+                          deleteMutation.mutate({ lineId: line.id });
                         }
                       }}
                       className="text-red-600 hover:text-red-900"
@@ -618,7 +646,7 @@ function SyllableCheck({ token }) {
                               `Delete line (${result.stored_syllables} → ${result.actual_syllables} syllables): "${result.text}"?`
                             )
                           ) {
-                            deleteMutation.mutate(result.id);
+                            deleteMutation.mutate({ lineId: result.id });
                           }
                         }}
                         className="text-red-600 hover:text-red-900"
