@@ -465,18 +465,44 @@ function SyllableCheck({ token }) {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: async (lineId) => {
-      const response = await fetch(`${API_BASE}/admin/lines/${lineId}`, {
+    mutationFn: async ({ lineId, cascade = false }) => {
+      console.log('[CASCADE DELETE v2 - SyllableCheck] Deleting line:', lineId, 'cascade:', cascade);
+      const url = cascade
+        ? `${API_BASE}/admin/lines/${lineId}?cascade=true`
+        : `${API_BASE}/admin/lines/${lineId}`;
+
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) throw new Error('Failed to delete line');
+      if (!response.ok) {
+        if (response.status === 409) {
+          const errorData = await response.json();
+          throw { status: 409, data: errorData.detail };
+        }
+        throw new Error('Failed to delete line');
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onError: (error, variables) => {
+      if (error.status === 409) {
+        const haikuCount = error.data.haiku_count;
+        const lineText = error.data.line_text;
+        if (
+          confirm(
+            `This line is used in ${haikuCount} haiku(s):\n\n"${lineText}"\n\nDo you want to delete the line AND all ${haikuCount} haiku(s) that use it?`
+          )
+        ) {
+          deleteMutation.mutate({ lineId: variables.lineId, cascade: true });
+        }
+      } else {
+        alert('Error deleting line: ' + error.message);
+      }
+    },
+    onSuccess: (data, variables) => {
       // Remove from results
-      setResults((prev) => prev.filter((r) => r.id !== deleteMutation.variables));
+      setResults((prev) => prev.filter((r) => r.id !== variables.lineId));
     },
   });
 
