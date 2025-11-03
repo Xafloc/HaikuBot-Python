@@ -403,6 +403,7 @@ function SyllableCheck({ token }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [method, setMethod] = useState('perl');
+  const [includeValidated, setIncludeValidated] = useState(false);
   const [results, setResults] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
   const queryClient = useQueryClient();
@@ -414,6 +415,7 @@ function SyllableCheck({ token }) {
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
       params.append('method', method);
+      params.append('include_validated', includeValidated);
 
       const response = await fetch(
         `${API_BASE}/admin/syllable-check?${params}`,
@@ -446,6 +448,22 @@ function SyllableCheck({ token }) {
     onSuccess: () => {
       // Remove from results
       setResults((prev) => prev.filter((r) => r.id !== deleteMutation.variables));
+    },
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: async (lineId) => {
+      const response = await fetch(`${API_BASE}/admin/lines/${lineId}/validate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error('Failed to validate line');
+      return response.json();
+    },
+    onSuccess: (data, lineId) => {
+      // Remove from results since it's now validated
+      setResults((prev) => prev.filter((r) => r.id !== lineId));
     },
   });
 
@@ -494,6 +512,20 @@ function SyllableCheck({ token }) {
               <option value="python">Python (64% accuracy - fallback)</option>
             </select>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={includeValidated}
+              onChange={(e) => setIncludeValidated(e.target.checked)}
+              className="mr-2 h-4 w-4 text-haiku-600 focus:ring-haiku-500 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-700">
+              Include human-validated lines (lines you've already marked as correct)
+            </span>
+          </label>
         </div>
 
         <button
@@ -569,7 +601,16 @@ function SyllableCheck({ token }) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {result.username}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-4">
+                      <button
+                        onClick={() => {
+                          validateMutation.mutate(result.id);
+                        }}
+                        className="text-green-600 hover:text-green-900"
+                        title="Mark this line as correct (human validation)"
+                      >
+                        Mark as Correct
+                      </button>
                       <button
                         onClick={() => {
                           if (

@@ -29,6 +29,7 @@ class Line(Base):
     source = Column(String(20), nullable=False)  # 'auto' or 'manual'
     placement = Column(String(10), nullable=True)  # 'any', 'first', 'last', or NULL (for 7-syl)
     approved = Column(Boolean, default=True)
+    human_validated = Column(Boolean, default=False, nullable=False)  # Admin verified syllable count is correct
     
     # Indexes for query performance
     __table_args__ = (

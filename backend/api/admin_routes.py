@@ -221,11 +221,36 @@ def delete_haiku(
         return {"success": True, "message": f"Deleted haiku {haiku_id}"}
 
 
+@router.post("/lines/{line_id}/validate")
+def validate_line_syllables(
+    line_id: int,
+    _authenticated: bool = Depends(verify_admin_token)
+) -> dict:
+    """Mark a line as human-validated (syllable count is correct despite algorithm disagreement)."""
+    with get_session() as session:
+        line = session.query(Line).filter(Line.id == line_id).first()
+
+        if not line:
+            raise HTTPException(status_code=404, detail="Line not found")
+
+        line.human_validated = True
+        session.commit()
+
+        logger.info(f"Admin validated line {line_id}: '{line.text}'")
+
+        return {
+            "success": True,
+            "line_id": line_id,
+            "message": "Line marked as validated"
+        }
+
+
 @router.post("/syllable-check")
 def check_syllables(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     method: str = "perl",
+    include_validated: bool = False,
     _authenticated: bool = Depends(verify_admin_token)
 ) -> List[SyllableCheckResult]:
     """Check syllable counts for lines in date range.
@@ -234,6 +259,7 @@ def check_syllables(
         start_date: Optional start date filter (ISO format)
         end_date: Optional end date filter (ISO format)
         method: Syllable counting method - "perl" (most accurate) or "python"
+        include_validated: Include human-validated lines in results (default: False)
 
     Returns lines where stored syllable count doesn't match actual count.
     """
@@ -254,6 +280,10 @@ def check_syllables(
                 query = query.filter(Line.timestamp <= end_dt)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid end_date format")
+
+        # Filter human-validated lines unless explicitly included
+        if not include_validated:
+            query = query.filter(Line.human_validated == False)
 
         lines = query.all()
 
