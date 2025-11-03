@@ -179,6 +179,7 @@ def delete_line(
                     "message": f"This line is used in {len(haikus_using_line)} haiku(s)",
                     "haiku_count": len(haikus_using_line),
                     "haiku_ids": [h.id for h in haikus_using_line],
+                    "haikus": [{"id": h.id, "text": h.full_text} for h in haikus_using_line],
                     "line_text": line.text
                 }
             )

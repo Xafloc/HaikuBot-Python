@@ -220,11 +220,17 @@ function ManageLines({ token }) {
         // Show dialog asking if user wants to cascade delete
         const haikuCount = error.data.haiku_count;
         const lineText = error.data.line_text;
-        if (
-          confirm(
-            `This line is used in ${haikuCount} haiku(s):\n\n"${lineText}"\n\nDo you want to delete the line AND all ${haikuCount} haiku(s) that use it?`
-          )
-        ) {
+        const haikus = error.data.haikus || [];
+
+        // Format haikus for display
+        const haikuText = haikus.map(h => {
+          const formatted = h.text.replace(/ \/ /g, '\n');
+          return `  Haiku #${h.id}:\n  ${formatted.replace(/\n/g, '\n  ')}`;
+        }).join('\n\n');
+
+        const message = `This line is used in ${haikuCount} haiku(s):\n\n"${lineText}"\n\n${haikuText}\n\nDo you want to delete the line AND all ${haikuCount} haiku(s) that use it?`;
+
+        if (confirm(message)) {
           // Retry with cascade=true
           deleteMutation.mutate({ lineId: variables.lineId, cascade: true });
         }
@@ -489,11 +495,17 @@ function SyllableCheck({ token }) {
       if (error.status === 409) {
         const haikuCount = error.data.haiku_count;
         const lineText = error.data.line_text;
-        if (
-          confirm(
-            `This line is used in ${haikuCount} haiku(s):\n\n"${lineText}"\n\nDo you want to delete the line AND all ${haikuCount} haiku(s) that use it?`
-          )
-        ) {
+        const haikus = error.data.haikus || [];
+
+        // Format haikus for display
+        const haikuText = haikus.map(h => {
+          const formatted = h.text.replace(/ \/ /g, '\n');
+          return `  Haiku #${h.id}:\n  ${formatted.replace(/\n/g, '\n  ')}`;
+        }).join('\n\n');
+
+        const message = `This line is used in ${haikuCount} haiku(s):\n\n"${lineText}"\n\n${haikuText}\n\nDo you want to delete the line AND all ${haikuCount} haiku(s) that use it?`;
+
+        if (confirm(message)) {
           deleteMutation.mutate({ lineId: variables.lineId, cascade: true });
         }
       } else {
