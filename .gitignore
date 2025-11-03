@@ -60,6 +60,9 @@ htmlcov/
 olddata/
 migration.log
 
+# Internal documentation (testing, research, etc.)
+internal-docs/
+
 # Misc
 .env
 .env.local
