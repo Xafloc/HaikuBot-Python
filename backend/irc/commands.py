@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Optional, TYPE_CHECKING
 from datetime import datetime
+from dataclasses import dataclass
 
 from ..config import get_config
 from ..database import get_session, Line, User, Vote, GeneratedHaiku
@@ -14,6 +15,28 @@ if TYPE_CHECKING:
     from .bot import HaikuBot
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Response:
+    """Response from a command handler.
+
+    Attributes:
+        message: The response message text
+        is_notice: If True, send as NOTICE (private error/info). If False, send publicly to channel.
+    """
+    message: str
+    is_notice: bool = False
+
+    @classmethod
+    def error(cls, message: str) -> 'Response':
+        """Create an error response (sent as NOTICE)."""
+        return cls(message=message, is_notice=True)
+
+    @classmethod
+    def success(cls, message: str) -> 'Response':
+        """Create a success response (sent publicly to channel)."""
+        return cls(message=message, is_notice=False)
 
 
 class CommandHandler:
@@ -29,16 +52,16 @@ class CommandHandler:
         self.config = get_config()
         self.prefix = self.config.bot.trigger_prefix
     
-    async def handle(self, username: str, channel: str, message: str) -> Optional[str]:
+    async def handle(self, username: str, channel: str, message: str) -> Optional[Response]:
         """Handle a command message.
-        
+
         Args:
             username: User who sent command
             channel: Channel where command was sent (or "PM")
             message: Full message text
-            
+
         Returns:
-            Response message or None
+            Response object or None
         """
         # Remove prefix
         if not message.startswith(self.prefix):
@@ -90,13 +113,13 @@ class CommandHandler:
                 return await handler(username, channel, args)
             except Exception as e:
                 logger.error(f"Error in command handler {command}: {e}", exc_info=True)
-                return f"Error: {str(e)}"
-        
+                return Response.error(f"Error: {str(e)}")
+
         return None
     
-    async def _cmd_haiku(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_haiku(self, username: str, channel: str, args: str) -> Response:
         """Generate a random haiku.
-        
+
         Supports filters:
         - !haiku @username - From specific user
         - !haiku #channel - From specific channel
@@ -105,7 +128,7 @@ class CommandHandler:
             # Parse arguments for filters
             username_filter = None
             channel_filter = None
-            
+
             if args:
                 # Check for @username
                 if args.startswith('@'):
@@ -122,15 +145,15 @@ class CommandHandler:
                         self.bot.server_name, channel
                     )
                 else:
-                    return f"Invalid filter. Use @username or #channel"
+                    return Response.error(f"Invalid filter. Use @username or #channel")
             else:
                 # Generate random haiku
                 haiku = generate_haiku(
                     session, username, self.bot.server_name, channel
                 )
-            
+
             if not haiku:
-                return "Not enough lines to generate a haiku. Contribute with !haiku5 or !haiku7!"
+                return Response.error("Not enough lines to generate a haiku. Contribute with !haiku5 or !haiku7!")
 
             # Get sources (usernames of each line contributor)
             sources = f"({haiku.line1.username}, {haiku.line2.username}, {haiku.line3.username})"
@@ -139,42 +162,42 @@ class CommandHandler:
             web_url = self.config.bot.web_url if hasattr(self.config.bot, 'web_url') else ""
             url_part = f" -- {web_url}" if web_url else ""
 
-            return f"{haiku.full_text} -- `{self.prefix}haikuvote {haiku.id}` -- Sources: {sources}{url_part}"
+            return Response.success(f"{haiku.full_text} -- `{self.prefix}haikuvote {haiku.id}` -- Sources: {sources}{url_part}")
     
-    async def _cmd_haiku5(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_haiku5(self, username: str, channel: str, args: str) -> Response:
         """Submit a 5-syllable line.
-        
+
         Format: !haiku5 [--first|--last] <text>
         """
         # Check authorization
         if not can_user_submit(username):
-            return f"You need editor privileges. Contact {self.config.bot.owner} for access."
-        
+            return Response.error(f"You need editor privileges. Contact {self.config.bot.owner} for access.")
+
         # Parse placement flag
         placement = 'any'
         text = args.strip()
-        
+
         if text.startswith('--first'):
             placement = 'first'
             text = text[7:].strip()
         elif text.startswith('--last'):
             placement = 'last'
             text = text[6:].strip()
-        
+
         if not text:
-            return "Usage: !haiku5 [--first|--last] <text>"
-        
+            return Response.error("Usage: !haiku5 [--first|--last] <text>")
+
         # Verify syllable count
         syllables = count_syllables(text)
         if syllables != 5:
-            return f"Syllable check failed: {syllables} syllables (expected 5)"
-        
+            return Response.error(f"Syllable check failed: {syllables} syllables (expected 5)")
+
         # Store line
         with get_session() as session:
             # Check for duplicate
             existing = session.query(Line).filter(Line.text.ilike(text)).first()
             if existing:
-                return "That line already exists in the database."
+                return Response.error("That line already exists in the database.")
             
             line = Line(
                 text=text,
@@ -210,30 +233,30 @@ class CommandHandler:
                 logger.error(f"Error broadcasting line to WebSocket: {ws_error}")
 
             placement_str = f" ({placement} position)" if placement != 'any' else ""
-            return f"Added 5-syllable line{placement_str}: {text}"
-    
-    async def _cmd_haiku7(self, username: str, channel: str, args: str) -> str:
+            return Response.success(f"Added 5-syllable line{placement_str}: {text}")
+
+    async def _cmd_haiku7(self, username: str, channel: str, args: str) -> Response:
         """Submit a 7-syllable line."""
         # Check authorization
         if not can_user_submit(username):
-            return f"You need editor privileges. Contact {self.config.bot.owner} for access."
-        
+            return Response.error(f"You need editor privileges. Contact {self.config.bot.owner} for access.")
+
         text = args.strip()
-        
+
         if not text:
-            return "Usage: !haiku7 <text>"
-        
+            return Response.error("Usage: !haiku7 <text>")
+
         # Verify syllable count
         syllables = count_syllables(text)
         if syllables != 7:
-            return f"Syllable check failed: {syllables} syllables (expected 7)"
-        
+            return Response.error(f"Syllable check failed: {syllables} syllables (expected 7)")
+
         # Store line
         with get_session() as session:
             # Check for duplicate
             existing = session.query(Line).filter(Line.text.ilike(text)).first()
             if existing:
-                return "That line already exists in the database."
+                return Response.error("That line already exists in the database.")
             
             line = Line(
                 text=text,
@@ -267,62 +290,62 @@ class CommandHandler:
             except Exception as ws_error:
                 logger.error(f"Error broadcasting line to WebSocket: {ws_error}")
 
-            return f"Added 7-syllable line: {text}"
-    
-    async def _cmd_stats(self, username: str, channel: str, args: str) -> str:
+            return Response.success(f"Added 7-syllable line: {text}")
+
+    async def _cmd_stats(self, username: str, channel: str, args: str) -> Response:
         """Show haiku statistics."""
         with get_session() as session:
             stats = get_haiku_stats(session)
-            
-            return (f"5-syllable lines: {stats['lines_5_syllable']} | "
+
+            return Response.success(f"5-syllable lines: {stats['lines_5_syllable']} | "
                    f"7-syllable lines: {stats['lines_7_syllable']} | "
                    f"Possible permutations: {stats['possible_permutations']:,} | "
                    f"Generated haikus: {stats['generated_haikus']}")
     
-    async def _cmd_vote(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_vote(self, username: str, channel: str, args: str) -> Response:
         """Vote for a haiku."""
         if not args or not args.strip().isdigit():
-            return "Usage: !haikuvote <haiku_id>"
-        
+            return Response.error("Usage: !haikuvote <haiku_id>")
+
         haiku_id = int(args.strip())
-        
+
         with get_session() as session:
             # Check if haiku exists
             haiku = session.query(GeneratedHaiku).filter(GeneratedHaiku.id == haiku_id).first()
             if not haiku:
-                return f"Haiku #{haiku_id} not found."
-            
+                return Response.error(f"Haiku #{haiku_id} not found.")
+
             # Check if already voted
             existing_vote = session.query(Vote).filter(
                 Vote.haiku_id == haiku_id,
                 Vote.username == username
             ).first()
-            
+
             if existing_vote:
-                return f"You've already voted for haiku #{haiku_id}!"
-            
+                return Response.error(f"You've already voted for haiku #{haiku_id}!")
+
             # Add vote
             vote = Vote(
                 haiku_id=haiku_id,
                 username=username,
                 voted_at=datetime.utcnow()
             )
-            
+
             session.add(vote)
             session.commit()
-            
-            return f"Thanks for voting! Haiku #{haiku_id} now has {len(haiku.votes) + 1} vote(s)."
+
+            return Response.success(f"Thanks for voting! Haiku #{haiku_id} now has {len(haiku.votes) + 1} vote(s).")
     
-    async def _cmd_top(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_top(self, username: str, channel: str, args: str) -> Response:
         """Show top voted haikus."""
         limit = 5
         if args and args.strip().isdigit():
             limit = min(int(args.strip()), 20)  # Cap at 20
-        
+
         with get_session() as session:
             # Query top haikus by vote count
             from sqlalchemy import func, desc
-            
+
             results = session.query(
                 GeneratedHaiku,
                 func.count(Vote.id).label('vote_count')
@@ -330,54 +353,54 @@ class CommandHandler:
                 desc('vote_count'),
                 desc(GeneratedHaiku.generated_at)
             ).limit(limit).all()
-            
+
             if not results:
-                return "No haikus have been generated yet!"
-            
+                return Response.error("No haikus have been generated yet!")
+
             lines = [f"Top {len(results)} Haiku(s):"]
             for haiku, vote_count in results:
                 lines.append(f"[{vote_count} votes] #{haiku.id}: {haiku.full_text}")
-            
+
             lines.append(f"Vote with {self.prefix}haikuvote <id>")
-            
+
             # Send as PM if in channel (return multiline for PM)
             if channel != "PM":
                 # For channel messages, send notice
                 for line in lines:
                     self.bot.send_notice(username, line)
-                return f"{username}: Sent top haikus via notice"
+                return Response.success(f"{username}: Sent top haikus via notice")
             else:
-                return "\n".join(lines)
+                return Response.success("\n".join(lines))
     
-    async def _cmd_my_haiku(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_my_haiku(self, username: str, channel: str, args: str) -> Response:
         """Show user's contributed lines."""
         with get_session() as session:
             lines = session.query(Line).filter(Line.username == username).limit(10).all()
-            
+
             if not lines:
-                return f"You haven't contributed any lines yet!"
-            
+                return Response.error(f"You haven't contributed any lines yet!")
+
             result = [f"Your contributions ({len(lines)} shown):"]
             for line in lines:
                 result.append(f"[{line.syllable_count} syl] {line.text}")
-            
+
             # Send as PM if in channel
             if channel != "PM":
                 for line in result:
                     self.bot.send_notice(username, line)
-                return f"{username}: Sent your haiku lines via notice"
+                return Response.success(f"{username}: Sent your haiku lines via notice")
             else:
-                return "\n".join(result)
+                return Response.success("\n".join(result))
     
-    async def _cmd_my_stats(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_my_stats(self, username: str, channel: str, args: str) -> Response:
         """Show user's personal statistics."""
         with get_session() as session:
             line_count = session.query(Line).filter(Line.username == username).count()
             haiku_count = session.query(GeneratedHaiku).filter(GeneratedHaiku.triggered_by == username).count()
-            
-            return f"{username}: {line_count} lines contributed, {haiku_count} haikus generated"
+
+            return Response.success(f"{username}: {line_count} lines contributed, {haiku_count} haikus generated")
     
-    async def _cmd_help(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_help(self, username: str, channel: str, args: str) -> Response:
         """Show help information."""
         help_text = f"""HaikuBot Commands:
 {self.prefix}haiku - Generate random haiku
@@ -404,98 +427,98 @@ Admin Commands:
 {self.prefix}haiku editors - List editors
 
 Web: {self.config.bot.web_url}"""
-        
+
         # Send as PM if in channel
         if channel != "PM":
             for line in help_text.split('\n'):
                 self.bot.send_notice(username, line)
-            return f"{username}: Sent help via notice"
+            return Response.success(f"{username}: Sent help via notice")
         else:
-            return help_text
+            return Response.success(help_text)
     
-    async def _cmd_list(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_list(self, username: str, channel: str, args: str) -> Response:
         """List generated haikus."""
-        return f"View all haikus at: {self.config.bot.web_url}"
+        return Response.success(f"View all haikus at: {self.config.bot.web_url}")
     
-    async def _cmd_promote(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_promote(self, username: str, channel: str, args: str) -> Response:
         """Promote user to editor (admin only)."""
         if not is_user_admin(username, self.config.bot.owner):
-            return "Admin only command."
-        
+            return Response.error("Admin only command.")
+
         if not args or not args.startswith('@'):
-            return "Usage: !haiku promote @username"
-        
+            return Response.error("Usage: !haiku promote @username")
+
         target_user = args[1:].strip()
-        
+
         with get_session() as session:
             user = get_or_create_user(session, target_user)
             if user.role == 'admin':
-                return f"{target_user} is already an admin."
-            
+                return Response.error(f"{target_user} is already an admin.")
+
             user.role = 'editor'
             session.commit()
-            
-            return f"{target_user} promoted to editor."
+
+            return Response.success(f"{target_user} promoted to editor.")
     
-    async def _cmd_demote(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_demote(self, username: str, channel: str, args: str) -> Response:
         """Demote user from editor (admin only)."""
         if not is_user_admin(username, self.config.bot.owner):
-            return "Admin only command."
-        
+            return Response.error("Admin only command.")
+
         if not args or not args.startswith('@'):
-            return "Usage: !haiku demote @username"
-        
+            return Response.error("Usage: !haiku demote @username")
+
         target_user = args[1:].strip()
-        
+
         with get_session() as session:
             user = session.query(User).filter(User.username == target_user).first()
             if not user:
-                return f"User {target_user} not found."
-            
+                return Response.error(f"User {target_user} not found.")
+
             if user.role == 'admin':
-                return "Cannot demote admin users."
-            
+                return Response.error("Cannot demote admin users.")
+
             user.role = 'public'
             session.commit()
-            
-            return f"{target_user} demoted to public user."
+
+            return Response.success(f"{target_user} demoted to public user.")
     
-    async def _cmd_editors(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_editors(self, username: str, channel: str, args: str) -> Response:
         """List all editors (admin only)."""
         if not is_user_admin(username, self.config.bot.owner):
-            return "Admin only command."
-        
+            return Response.error("Admin only command.")
+
         with get_session() as session:
             editors = session.query(User).filter(User.role.in_(['editor', 'admin'])).all()
-            
+
             if not editors:
-                return "No editors found."
-            
+                return Response.error("No editors found.")
+
             result = ["Editors:"]
             for user in editors:
                 result.append(f"- {user.username} ({user.role})")
-            
-            return "\n".join(result)
+
+            return Response.success("\n".join(result))
     
-    async def _cmd_optout(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_optout(self, username: str, channel: str, args: str) -> Response:
         """Opt out of auto-collection."""
         with get_session() as session:
             user = get_or_create_user(session, username)
             user.opted_out = True
             session.commit()
-            
-            return "You've opted out of auto-collection. Your messages won't be collected automatically."
+
+            return Response.success("You've opted out of auto-collection. Your messages won't be collected automatically.")
     
-    async def _cmd_optin(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_optin(self, username: str, channel: str, args: str) -> Response:
         """Opt back into auto-collection."""
         with get_session() as session:
             user = get_or_create_user(session, username)
             user.opted_out = False
             session.commit()
 
-            return "You've opted back into auto-collection. Your messages may be collected automatically."
+            return Response.success("You've opted back into auto-collection. Your messages may be collected automatically.")
 
-    async def _cmd_delete(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_delete(self, username: str, channel: str, args: str) -> Response:
         """Delete a line or haiku (admin only).
 
         Usage:
@@ -504,20 +527,20 @@ Web: {self.config.bot.web_url}"""
         """
         # Check authorization
         if not is_user_admin(username, self.config.bot.owner):
-            return "Admin only command."
+            return Response.error("Admin only command.")
 
         if not args:
-            return "Usage: !haiku delete [line|haiku] <id>"
+            return Response.error("Usage: !haiku delete [line|haiku] <id>")
 
         parts = args.split()
         if len(parts) < 2:
-            return "Usage: !haiku delete [line|haiku] <id>"
+            return Response.error("Usage: !haiku delete [line|haiku] <id>")
 
         item_type = parts[0].lower()
         item_id = parts[1]
 
         if not item_id.isdigit():
-            return "ID must be a number."
+            return Response.error("ID must be a number.")
 
         item_id = int(item_id)
 
@@ -527,7 +550,7 @@ Web: {self.config.bot.web_url}"""
                 line = session.query(Line).filter(Line.id == item_id).first()
 
                 if not line:
-                    return f"Line #{item_id} not found."
+                    return Response.error(f"Line #{item_id} not found.")
 
                 # Check if line is used in any haikus
                 haikus_using_line = session.query(GeneratedHaiku).filter(
@@ -538,20 +561,20 @@ Web: {self.config.bot.web_url}"""
 
                 if haikus_using_line:
                     haiku_ids = ', '.join(str(h.id) for h in haikus_using_line)
-                    return f"Cannot delete line #{item_id}: Used in {len(haikus_using_line)} haiku(s) (IDs: {haiku_ids}). Delete those haikus first."
+                    return Response.error(f"Cannot delete line #{item_id}: Used in {len(haikus_using_line)} haiku(s) (IDs: {haiku_ids}). Delete those haikus first.")
 
                 line_text = line.text
                 session.delete(line)
                 session.commit()
 
-                return f"Deleted line #{item_id}: \"{line_text}\""
+                return Response.success(f"Deleted line #{item_id}: \"{line_text}\"")
 
             elif item_type == 'haiku':
                 # Delete a haiku
                 haiku = session.query(GeneratedHaiku).filter(GeneratedHaiku.id == item_id).first()
 
                 if not haiku:
-                    return f"Haiku #{item_id} not found."
+                    return Response.error(f"Haiku #{item_id} not found.")
 
                 # Also delete associated votes
                 vote_count = session.query(Vote).filter(Vote.haiku_id == item_id).count()
@@ -562,23 +585,23 @@ Web: {self.config.bot.web_url}"""
                 session.commit()
 
                 vote_msg = f" and {vote_count} vote(s)" if vote_count > 0 else ""
-                return f"Deleted haiku #{item_id}{vote_msg}: \"{haiku_text}\""
+                return Response.success(f"Deleted haiku #{item_id}{vote_msg}: \"{haiku_text}\"")
 
             else:
-                return "Invalid type. Use 'line' or 'haiku'."
+                return Response.error("Invalid type. Use 'line' or 'haiku'.")
 
-    async def _cmd_syllable_check(self, username: str, channel: str, args: str) -> str:
+    async def _cmd_syllable_check(self, username: str, channel: str, args: str) -> Response:
         """Check syllable count of provided text.
 
         Usage: !haikusyl <text>
         """
         if not args or not args.strip():
-            return "Usage: !haikusyl <text>"
+            return Response.error("Usage: !haikusyl <text>")
 
         from backend.haiku.syllable_counter import count_syllables
 
         text = args.strip()
         syllable_count = count_syllables(text)
 
-        return f"Syllable Count: {syllable_count}"
+        return Response.success(f"Syllable Count: {syllable_count}")
 

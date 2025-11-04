@@ -10,7 +10,7 @@ from datetime import datetime
 from ..config import get_config
 from ..database import get_session, Line, User
 from ..haiku import count_syllables, validate_line_for_auto_collection
-from .commands import CommandHandler
+from .commands import CommandHandler, Response
 
 logger = logging.getLogger(__name__)
 
@@ -117,20 +117,32 @@ class HaikuBot(irc.bot.SingleServerIRCBot):
     
     def on_privmsg(self, connection, event):
         """Called when a private message is received.
-        
+
         Args:
             connection: IRC connection
             event: Message event
         """
         source = event.source.nick
         message = event.arguments[0]
-        
+
         logger.debug(f"[{self.server_name}][PM] <{source}> {message}")
-        
+
         # Check if this is a command
         prefix = self.config.bot.trigger_prefix
         if message.startswith(prefix):
             self._handle_command(connection, source, "PM", message)
+
+    def send_notice(self, target: str, message: str):
+        """Send a NOTICE message to a user.
+
+        Args:
+            target: User to send notice to
+            message: Message text
+        """
+        try:
+            self.connection.notice(target, message)
+        except Exception as e:
+            logger.error(f"Error sending notice to {target}: {e}")
     
     def _handle_command(self, connection, source: str, channel: str, message: str):
         """Handle a command message.
@@ -152,21 +164,38 @@ class HaikuBot(irc.bot.SingleServerIRCBot):
             loop.close()
             
             if response:
-                # Send response back to channel or user
-                if channel == "PM":
-                    connection.privmsg(source, response)
+                # Handle Response object
+                if isinstance(response, Response):
+                    message_text = response.message
+
+                    if response.is_notice:
+                        # Send as NOTICE (private, non-intrusive)
+                        for line in message_text.split('\n'):
+                            if line.strip():
+                                connection.notice(source, line)
+                    else:
+                        # Send as public message to channel (or PM if in PM)
+                        if channel == "PM":
+                            for line in message_text.split('\n'):
+                                if line.strip():
+                                    connection.privmsg(source, line)
+                        else:
+                            for line in message_text.split('\n'):
+                                if line.strip():
+                                    connection.privmsg(channel, line)
                 else:
-                    # Split long messages
-                    for line in response.split('\n'):
-                        if line.strip():
-                            connection.privmsg(channel, line)
+                    # Backward compatibility: handle string responses (shouldn't happen now)
+                    if channel == "PM":
+                        connection.privmsg(source, response)
+                    else:
+                        for line in response.split('\n'):
+                            if line.strip():
+                                connection.privmsg(channel, line)
         except Exception as e:
             logger.error(f"Error handling command: {e}", exc_info=True)
             error_msg = "Sorry, an error occurred processing that command."
-            if channel == "PM":
-                connection.privmsg(source, error_msg)
-            else:
-                connection.privmsg(channel, error_msg)
+            # Send errors as NOTICE (private)
+            connection.notice(source, error_msg)
     
     def _auto_collect(self, username: str, channel: str, message: str):
         """Auto-collect 5 or 7 syllable messages.
