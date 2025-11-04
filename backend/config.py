@@ -40,6 +40,7 @@ class WebConfig(BaseModel):
     """Web server configuration."""
     host: str = "0.0.0.0"
     port: int = 8000
+    live_feed_duration_minutes: int = 60
     cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
 

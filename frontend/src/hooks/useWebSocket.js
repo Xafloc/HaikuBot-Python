@@ -10,8 +10,7 @@ const getWebSocketURL = () => {
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
-  const [newHaiku, setNewHaiku] = useState(null);
-  const [newLine, setNewLine] = useState(null);
+  const [recentItems, setRecentItems] = useState([]); // Array of {type, data, receivedAt}
   const ws = useRef(null);
   const reconnectTimeout = useRef(null);
 
@@ -38,10 +37,13 @@ export function useWebSocket() {
           const data = JSON.parse(event.data);
           setLastMessage(data);
 
-          if (data.type === 'new_haiku') {
-            setNewHaiku(data.data);
-          } else if (data.type === 'new_line') {
-            setNewLine(data.data);
+          if (data.type === 'new_haiku' || data.type === 'new_line') {
+            // Add new item to the beginning of the array with timestamp
+            setRecentItems(prev => [{
+              type: data.type,
+              data: data.data,
+              receivedAt: new Date().getTime()
+            }, ...prev]);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -85,13 +87,17 @@ export function useWebSocket() {
     };
   }, [connect]);
 
+  const clearOldItems = useCallback((maxAgeMinutes) => {
+    const now = new Date().getTime();
+    const maxAgeMs = maxAgeMinutes * 60 * 1000;
+    setRecentItems(prev => prev.filter(item => (now - item.receivedAt) < maxAgeMs));
+  }, []);
+
   return {
     isConnected,
     lastMessage,
-    newHaiku,
-    newLine,
-    clearNewHaiku: () => setNewHaiku(null),
-    clearNewLine: () => setNewLine(null),
+    recentItems,
+    clearOldItems,
   };
 }
 
