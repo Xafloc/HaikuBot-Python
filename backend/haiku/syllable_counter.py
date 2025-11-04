@@ -132,6 +132,76 @@ def _count_syllables_perl(text: str) -> int:
         return 0
 
 
+def _convert_number_to_words(word: str) -> Optional[str]:
+    """Convert numeric string to words (e.g., "42" -> "forty-two").
+
+    Args:
+        word: Word to check and potentially convert
+
+    Returns:
+        Word representation of number if word is numeric, None otherwise
+    """
+    if not word.isdigit():
+        return None
+
+    try:
+        import inflect
+        p = inflect.engine()
+        return p.number_to_words(word)
+    except Exception as e:
+        logger.debug(f"Failed to convert number '{word}' to words: {e}")
+        return None
+
+
+def _count_syllables_perl_word_by_word(text: str) -> int:
+    """Count syllables word-by-word: check acronyms first, then convert numbers, then call Perl.
+
+    This ensures that:
+    - Known acronyms use their database syllable counts
+    - Numbers are converted to words before counting (e.g., "42" -> "forty-two")
+    - Only non-acronym, non-number words are sent to Perl
+
+    Args:
+        text: Text to count syllables in
+
+    Returns:
+        Total syllable count
+    """
+    if not text or not text.strip():
+        return 0
+
+    # Clean and split text into words (remove punctuation, split on spaces/hyphens)
+    cleaned = re.sub(r'[^\w\s\-]', '', text)
+    words = re.split(r'[\s\-]+', cleaned)
+
+    total = 0
+
+    for word in words:
+        if not word:
+            continue
+
+        # Priority 1: Check if word is a known acronym
+        acronym_count = _check_acronym(word.lower())
+        if acronym_count > 0:
+            total += acronym_count
+            logger.debug(f"Word: '{word}' -> acronym={acronym_count}")
+            continue
+
+        # Priority 2: Convert numbers to words
+        if word.isdigit():
+            word_text = _convert_number_to_words(word)
+            if word_text:
+                logger.debug(f"Number: '{word}' -> '{word_text}'")
+                word = word_text
+
+        # Priority 3: Call Perl for the word (or converted number text)
+        perl_count = _count_syllables_perl(word)
+        total += perl_count
+        logger.debug(f"Word: '{word}' -> perl={perl_count}")
+
+    return total
+
+
 def count_syllables(text: str, method: str = "perl") -> int:
     """Count syllables in text using selected method.
 
@@ -149,9 +219,9 @@ def count_syllables(text: str, method: str = "perl") -> int:
     if not text or not text.strip():
         return 0
 
-    # Method 1: Perl (most accurate - 78%)
+    # Method 1: Perl with acronym and number support (most accurate - 78%)
     if method == "perl":
-        count = _count_syllables_perl(text)
+        count = _count_syllables_perl_word_by_word(text)
         if count > 0:
             return count
         # Fall back to Python if Perl fails
@@ -391,11 +461,6 @@ def validate_line_for_auto_collection(text: str) -> tuple[bool, Optional[str]]:
     invalid_words = []
     for word in words:
         if not word:
-            continue
-
-        # Skip very short words (contractions like "I'm" become "Im", single letters, etc.)
-        # These might not be in CMU dict but are usually valid
-        if len(word) <= 2:
             continue
 
         if not is_valid_english_word(word):
