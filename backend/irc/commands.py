@@ -347,7 +347,10 @@ class CommandHandler:
             session.add(vote)
             session.commit()
 
-            return Response.notice(f"Thanks for voting! Haiku #{haiku_id} now has {len(haiku.votes) + 1} vote(s).")
+            # Get current vote count after committing
+            vote_count = session.query(Vote).filter(Vote.haiku_id == haiku_id).count()
+
+            return Response.notice(f"Thanks for voting! Haiku #{haiku_id} now has {vote_count} vote(s).")
     
     async def _cmd_top(self, username: str, channel: str, args: str) -> Response:
         """Show top voted haikus."""
