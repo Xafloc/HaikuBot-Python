@@ -123,11 +123,12 @@ class CommandHandler:
         return None
     
     async def _cmd_haiku(self, username: str, channel: str, args: str) -> Response:
-        """Generate a random haiku.
+        """Generate a random haiku or retrieve specific haiku by ID.
 
         Supports filters:
         - !haiku @username - From specific user
         - !haiku #channel - From specific channel
+        - !haiku <id> - Retrieve specific haiku by ID
         """
         with get_session() as session:
             # Parse arguments for filters
@@ -135,8 +136,15 @@ class CommandHandler:
             channel_filter = None
 
             if args:
+                # Check for numeric ID
+                if args.strip().isdigit():
+                    haiku_id = int(args.strip())
+                    haiku = session.query(GeneratedHaiku).filter(GeneratedHaiku.id == haiku_id).first()
+
+                    if not haiku:
+                        return Response.error(f"Haiku #{haiku_id} not found.")
                 # Check for @username
-                if args.startswith('@'):
+                elif args.startswith('@'):
                     username_filter = args[1:].strip()
                     haiku = generate_haiku_for_user(
                         session, username_filter, username,
@@ -150,7 +158,7 @@ class CommandHandler:
                         self.bot.server_name, channel
                     )
                 else:
-                    return Response.error(f"Invalid filter. Use @username or #channel")
+                    return Response.error(f"Invalid filter. Use @username, #channel, or numeric ID")
             else:
                 # Generate random haiku
                 haiku = generate_haiku(
