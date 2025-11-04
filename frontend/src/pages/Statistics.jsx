@@ -22,11 +22,12 @@ function Statistics() {
 
     const digits = num.toString().length;
 
-    if (digits <= 9) return 'text-4xl';      // Up to 999,999,999
-    if (digits <= 12) return 'text-3xl';     // Up to 999,999,999,999
-    if (digits <= 15) return 'text-2xl';     // Up to quadrillions
-    if (digits <= 18) return 'text-xl';      // Up to quintillions
-    return 'text-lg';                         // Anything larger
+    if (digits <= 6) return 'text-4xl';      // Up to 999,999
+    if (digits <= 9) return 'text-3xl';      // Up to 999,999,999
+    if (digits <= 12) return 'text-2xl';     // Up to 999,999,999,999
+    if (digits <= 15) return 'text-xl';      // Up to quadrillions
+    if (digits <= 18) return 'text-lg';      // Up to quintillions
+    return 'text-base';                      // Anything larger
   };
 
   return (
