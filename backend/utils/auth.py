@@ -12,34 +12,41 @@ logger = logging.getLogger(__name__)
 
 def get_or_create_user(session: Session, username: str) -> User:
     """Get or create a user record.
-    
+
     Args:
         session: Database session
         username: Username to look up or create
-        
+
     Returns:
         User object
     """
+    config = get_config()
     user = session.query(User).filter(User.username == username).first()
-    
+
     if not user:
         logger.info(f"Creating new user record for: {username}")
-        
+
         # Check if this is the bot owner (make admin)
-        config = get_config()
         role = 'admin' if username == config.bot.owner else 'public'
-        
+
         user = User(
             username=username,
             role=role,
             opted_out=False,
             created_at=datetime.utcnow()
         )
-        
+
         session.add(user)
         session.commit()
         session.refresh(user)
-    
+    else:
+        # If user exists but is the bot owner and not admin, promote them
+        if username == config.bot.owner and user.role != 'admin':
+            logger.info(f"Promoting bot owner {username} to admin")
+            user.role = 'admin'
+            session.commit()
+            session.refresh(user)
+
     return user
 
 
