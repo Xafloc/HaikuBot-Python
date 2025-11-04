@@ -504,6 +504,9 @@ function SyllableCheck({ token }) {
   const [results, setResults] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingLineId, setEditingLineId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [editSyllables, setEditSyllables] = useState(5);
   const queryClient = useQueryClient();
 
   const handleCheck = async () => {
@@ -596,6 +599,62 @@ function SyllableCheck({ token }) {
       setResults((prev) => prev.filter((r) => r.id !== lineId));
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ lineId, text, syllable_count }) => {
+      const response = await fetch(`${API_BASE}/admin/lines/${lineId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, syllable_count }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update line');
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      // Update the line in results
+      setResults((prev) =>
+        prev.map((r) =>
+          r.id === variables.lineId
+            ? { ...r, text: variables.text, stored_syllables: variables.syllable_count }
+            : r
+        )
+      );
+      // Clear edit mode
+      setEditingLineId(null);
+      alert('Line updated successfully!');
+    },
+    onError: () => {
+      alert('Failed to update line');
+    },
+  });
+
+  const handleEditClick = (result) => {
+    setEditingLineId(result.id);
+    setEditText(result.text);
+    setEditSyllables(result.stored_syllables);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editText.trim()) {
+      alert('Text cannot be empty');
+      return;
+    }
+    updateMutation.mutate({
+      lineId: editingLineId,
+      text: editText,
+      syllable_count: editSyllables,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLineId(null);
+    setEditText('');
+    setEditSyllables(5);
+  };
 
   return (
     <div>
@@ -737,17 +796,37 @@ function SyllableCheck({ token }) {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredResults.map((result) => (
-                  <tr key={result.id} className="hover:bg-gray-50">
+                  <tr key={result.id} className={editingLineId === result.id ? "bg-blue-50" : "hover:bg-gray-50"}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {result.id}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {result.text}
+                      {editingLineId === result.id ? (
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded"
+                        />
+                      ) : (
+                        result.text
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        {result.stored_syllables}
-                      </span>
+                      {editingLineId === result.id ? (
+                        <select
+                          value={editSyllables}
+                          onChange={(e) => setEditSyllables(parseInt(e.target.value))}
+                          className="px-2 py-1 border border-gray-300 rounded"
+                        >
+                          <option value={5}>5</option>
+                          <option value={7}>7</option>
+                        </select>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          {result.stored_syllables}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -757,30 +836,56 @@ function SyllableCheck({ token }) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {result.username}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-4">
-                      <button
-                        onClick={() => {
-                          validateMutation.mutate(result.id);
-                        }}
-                        className="text-green-600 hover:text-green-900"
-                        title="Mark this line as correct (human validation)"
-                      >
-                        Mark as Correct
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Delete line (${result.stored_syllables} → ${result.actual_syllables} syllables): "${result.text}"?`
-                            )
-                          ) {
-                            deleteMutation.mutate({ lineId: result.id });
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                      {editingLineId === result.id ? (
+                        <>
+                          <button
+                            onClick={handleSaveEdit}
+                            className="text-blue-600 hover:text-blue-900 font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleEditClick(result)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Edit this line's text and syllable count"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              validateMutation.mutate(result.id);
+                            }}
+                            className="text-green-600 hover:text-green-900"
+                            title="Mark this line as correct (human validation)"
+                          >
+                            Mark as Correct
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `Delete line (${result.stored_syllables} → ${result.actual_syllables} syllables): "${result.text}"?`
+                                )
+                              ) {
+                                deleteMutation.mutate({ lineId: result.id });
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
