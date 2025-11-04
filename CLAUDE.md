@@ -276,6 +276,38 @@ npm run dev  # Runs on http://localhost:5173
 - Test authorization logic
 - Manual IRC testing in #bots channels
 
+#### Testing Syllable Counts Locally
+
+The project includes a local Perl syllable counter that uses the same `Lingua::EN::Syllable` module as production. To test syllable counts:
+
+**Test a single word:**
+```bash
+perl backend/haiku/perl_syllable_counter.pl "people"
+# Output: 1 (note: this is incorrect - "people" should be 2 syllables)
+```
+
+**Test multiple words:**
+```bash
+for word in some people are just like; do
+    count=$(perl backend/haiku/perl_syllable_counter.pl "$word")
+    echo "$word: $count syllable(s)"
+done
+```
+
+**Test a full phrase:**
+```bash
+perl backend/haiku/perl_syllable_counter.pl "some people are just like"
+# Output: 5 (expected: 6 due to "people" miscounted as 1)
+```
+
+**Known issues with Lingua::EN::Syllable:**
+- "people" → counted as 1, should be 2
+- "poetry" → counted as 2, should be 3
+- Accuracy: ~78% (best available Perl module)
+- These issues are why we have manual edit and validation features in the admin panel
+
+The module is located at `backend/haiku/perl_syllable_counter.pl` and uses the local installation at `Lingua-EN-Syllable-0.31/lib`.
+
 ### Deployment
 - Systemd service for production
 - FastAPI serves both API and built frontend
