@@ -170,8 +170,8 @@ def _count_syllables_perl_word_by_word(text: str) -> int:
     if not text or not text.strip():
         return 0
 
-    # Clean and split text into words (remove punctuation, split on spaces/hyphens)
-    cleaned = re.sub(r'[^\w\s\-]', '', text)
+    # Clean and split text into words (remove punctuation but keep apostrophes, split on spaces/hyphens)
+    cleaned = re.sub(r"[^\w\s\-']", '', text)
     words = re.split(r'[\s\-]+', cleaned)
 
     total = 0
@@ -231,8 +231,8 @@ def count_syllables(text: str, method: str = "perl") -> int:
     # Clean and normalize text - but preserve original case for CamelCase detection
     text = text.strip()
 
-    # Remove punctuation but keep spaces and hyphens (for compound words)
-    cleaned = re.sub(r'[^\w\s\-]', '', text)
+    # Remove punctuation but keep spaces, hyphens, and apostrophes
+    cleaned = re.sub(r"[^\w\s\-']", '', text)
 
     # Split into words (split on spaces and hyphens)
     words = re.split(r'[\s\-]+', cleaned)
@@ -451,8 +451,8 @@ def validate_line_for_auto_collection(text: str) -> tuple[bool, Optional[str]]:
     if not text or not text.strip():
         return False, "Empty text"
 
-    # Clean text - remove punctuation but keep letters, numbers, spaces, hyphens
-    cleaned = re.sub(r'[^\w\s\-]', '', text)
+    # Clean text - remove punctuation but keep letters, numbers, spaces, hyphens, apostrophes
+    cleaned = re.sub(r"[^\w\s\-']", '', text)
 
     # Split into words
     words = re.split(r'[\s\-]+', cleaned)
