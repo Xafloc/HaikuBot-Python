@@ -9,7 +9,7 @@ from datetime import datetime
 
 from ..config import get_config
 from ..database import get_session, Line, User
-from ..haiku import count_syllables
+from ..haiku import count_syllables, validate_line_for_auto_collection
 from .commands import CommandHandler
 
 logger = logging.getLogger(__name__)
@@ -170,7 +170,7 @@ class HaikuBot(irc.bot.SingleServerIRCBot):
     
     def _auto_collect(self, username: str, channel: str, message: str):
         """Auto-collect 5 or 7 syllable messages.
-        
+
         Args:
             username: User who sent the message
             channel: Channel where message was sent
@@ -182,12 +182,18 @@ class HaikuBot(irc.bot.SingleServerIRCBot):
             if user and user.opted_out:
                 logger.debug(f"User {username} has opted out, skipping auto-collect")
                 return
-        
+
         # Count syllables
         syllable_count = count_syllables(message)
-        
+
         # Only collect 5 or 7 syllable messages
         if syllable_count not in [5, 7]:
+            return
+
+        # Validate that message contains only valid English words or approved acronyms
+        is_valid, reason = validate_line_for_auto_collection(message)
+        if not is_valid:
+            logger.debug(f"Rejecting auto-collect for '{message}': {reason}")
             return
         
         # Store the line

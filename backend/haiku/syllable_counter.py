@@ -320,13 +320,103 @@ def _count_syllables_heuristic(word: str) -> int:
     return max(1, syllable_count)
 
 
+def is_valid_english_word(word: str) -> bool:
+    """Check if a word is valid English or an approved acronym.
+
+    Valid words are:
+    - In the CMU Pronouncing Dictionary
+    - In the approved acronyms database
+    - Numbers (digits)
+
+    Args:
+        word: Single word to validate (should be alphanumeric only)
+
+    Returns:
+        True if word is valid, False otherwise
+    """
+    if not word:
+        return False
+
+    word_lower = word.lower()
+
+    # Allow pure numbers
+    if word.isdigit():
+        return True
+
+    # Check if it's an approved acronym
+    acronym_count = _check_acronym(word_lower)
+    if acronym_count > 0:
+        logger.debug(f"Word '{word}' validated as acronym")
+        return True
+
+    # Check CMU Pronouncing Dictionary
+    try:
+        phones = pronouncing.phones_for_word(word_lower)
+        if phones:
+            logger.debug(f"Word '{word}' found in CMU dictionary")
+            return True
+    except Exception as e:
+        logger.debug(f"CMU lookup failed for '{word}': {e}")
+
+    # Word not found in any dictionary
+    logger.debug(f"Word '{word}' not found in dictionaries")
+    return False
+
+
+def validate_line_for_auto_collection(text: str) -> tuple[bool, Optional[str]]:
+    """Validate that a line contains only recognized English words or approved acronyms.
+
+    This prevents auto-collection of:
+    - Technical jargon (KVM, Vbox, etc.)
+    - Product names (PlayonLinux, etc.)
+    - Emoticons (:p, :), etc.)
+    - Random letter combinations
+
+    Args:
+        text: Line to validate
+
+    Returns:
+        Tuple of (is_valid, reason_if_invalid)
+    """
+    if not text or not text.strip():
+        return False, "Empty text"
+
+    # Clean text - remove punctuation but keep letters, numbers, spaces, hyphens
+    cleaned = re.sub(r'[^\w\s\-]', '', text)
+
+    # Split into words
+    words = re.split(r'[\s\-]+', cleaned)
+
+    # Check each word
+    invalid_words = []
+    for word in words:
+        if not word:
+            continue
+
+        # Skip very short words (contractions like "I'm" become "Im", single letters, etc.)
+        # These might not be in CMU dict but are usually valid
+        if len(word) <= 2:
+            continue
+
+        if not is_valid_english_word(word):
+            invalid_words.append(word)
+
+    if invalid_words:
+        reason = f"Invalid words: {', '.join(invalid_words)}"
+        logger.debug(f"Line validation failed: '{text}' - {reason}")
+        return False, reason
+
+    logger.debug(f"Line validation passed: '{text}'")
+    return True, None
+
+
 def is_haiku_line(text: str, target_syllables: int) -> bool:
     """Check if text matches target syllable count.
-    
+
     Args:
         text: Text to check
         target_syllables: Target syllable count (5 or 7)
-        
+
     Returns:
         True if text has exactly target_syllables syllables
     """
