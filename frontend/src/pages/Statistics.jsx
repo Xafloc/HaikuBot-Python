@@ -17,19 +17,16 @@ function Statistics() {
     return num?.toLocaleString() || '0';
   };
 
-  const formatLargeNumber = (num) => {
-    if (!num) return '0';
+  const getDynamicFontSize = (num) => {
+    if (!num) return 'text-4xl';
 
-    if (num >= 1e9) {
-      return (num / 1e9).toFixed(1) + 'B';
-    }
-    if (num >= 1e6) {
-      return (num / 1e6).toFixed(1) + 'M';
-    }
-    if (num >= 1e3) {
-      return (num / 1e3).toFixed(1) + 'K';
-    }
-    return num.toLocaleString();
+    const digits = num.toString().length;
+
+    if (digits <= 9) return 'text-4xl';      // Up to 999,999,999
+    if (digits <= 12) return 'text-3xl';     // Up to 999,999,999,999
+    if (digits <= 15) return 'text-2xl';     // Up to quadrillions
+    if (digits <= 18) return 'text-xl';      // Up to quintillions
+    return 'text-lg';                         // Anything larger
   };
 
   return (
@@ -66,8 +63,8 @@ function Statistics() {
             </div>
 
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-              <div className="text-4xl font-bold mb-2">
-                {formatLargeNumber(stats.possible_permutations)}
+              <div className={`font-bold mb-2 ${getDynamicFontSize(stats.possible_permutations)}`}>
+                {formatNumber(stats.possible_permutations)}
               </div>
               <div className="text-orange-100">Possible Combinations</div>
             </div>
