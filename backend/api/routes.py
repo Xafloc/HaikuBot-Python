@@ -77,23 +77,25 @@ async def list_haikus(
     limit: int = Query(50, ge=1, le=100),
     server: Optional[str] = None,
     channel: Optional[str] = None,
-    username: Optional[str] = None
+    username: Optional[str] = None,
+    search: Optional[str] = None
 ):
     """List generated haikus with pagination and filters.
-    
+
     Args:
         skip: Number of records to skip
         limit: Maximum number of records to return
         server: Optional server filter
         channel: Optional channel filter
         username: Optional username filter (triggered_by)
-        
+        search: Search by haiku text or ID
+
     Returns:
         List of haikus
     """
     with get_session() as session:
         query = session.query(GeneratedHaiku)
-        
+
         # Apply filters
         if server:
             query = query.filter(GeneratedHaiku.server == server)
@@ -101,6 +103,13 @@ async def list_haikus(
             query = query.filter(GeneratedHaiku.channel == channel)
         if username:
             query = query.filter(GeneratedHaiku.triggered_by == username)
+        if search:
+            # Search in haiku text or ID
+            search_term = f"%{search}%"
+            query = query.filter(
+                (GeneratedHaiku.full_text.ilike(search_term)) |
+                (GeneratedHaiku.id == int(search) if search.isdigit() else False)
+            )
         
         # Order by most recent
         query = query.order_by(desc(GeneratedHaiku.generated_at))

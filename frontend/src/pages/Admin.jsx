@@ -171,16 +171,18 @@ function Admin() {
 function ManageLines({ token }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
   const { data: lines, isLoading } = useQuery({
-    queryKey: ['admin-lines', startDate, endDate],
+    queryKey: ['admin-lines', startDate, endDate, searchTerm],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
-      params.append('limit', '100');
+      if (searchTerm) params.append('search', searchTerm);
+      params.append('limit', '1000');
 
       const response = await fetch(`${API_BASE}/admin/lines?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -190,6 +192,10 @@ function ManageLines({ token }) {
       return response.json();
     },
   });
+
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async ({ lineId, cascade = false }) => {
@@ -241,22 +247,11 @@ function ManageLines({ token }) {
     },
   });
 
-  // Filter lines based on search term
-  const filteredLines = lines?.filter((line) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      line.text.toLowerCase().includes(search) ||
-      line.username.toLowerCase().includes(search) ||
-      line.id.toString().includes(search)
-    );
-  });
-
   return (
     <div>
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Filter Lines</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-lg font-semibold mb-4">Search & Filter Lines</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Start Date
@@ -286,10 +281,22 @@ function ManageLines({ token }) {
             <input
               type="text"
               placeholder="Search by text, user, or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              &nbsp;
+            </label>
+            <button
+              onClick={handleSearch}
+              className="w-full btn-primary"
+            >
+              Search
+            </button>
           </div>
         </div>
       </div>
@@ -324,7 +331,7 @@ function ManageLines({ token }) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredLines?.map((line) => (
+              {lines?.map((line) => (
                 <tr key={line.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {line.id}
@@ -363,21 +370,30 @@ function ManageLines({ token }) {
 
 function ManageHaikus({ token }) {
   const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const limit = 20;
   const queryClient = useQueryClient();
 
   const { data: haikus, isLoading } = useQuery({
-    queryKey: ['admin-haikus', page],
+    queryKey: ['admin-haikus', page, searchTerm],
     queryFn: async () => {
-      const response = await fetch(
-        `${API_BASE}/haikus?skip=${page * limit}&limit=${limit}`
-      );
+      const params = new URLSearchParams();
+      params.append('skip', page * limit);
+      params.append('limit', limit);
+      if (searchTerm) params.append('search', searchTerm);
+
+      const response = await fetch(`${API_BASE}/haikus?${params}`);
 
       if (!response.ok) throw new Error('Failed to fetch haikus');
       return response.json();
     },
   });
+
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+    setPage(0); // Reset to first page when searching
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (haikuId) => {
@@ -394,30 +410,27 @@ function ManageHaikus({ token }) {
     },
   });
 
-  // Filter haikus based on search term
-  const filteredHaikus = haikus?.filter((haiku) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      haiku.full_text.toLowerCase().includes(search) ||
-      haiku.id.toString().includes(search)
-    );
-  });
-
   return (
     <div>
       {/* Search Bar */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Search Haikus
-        </label>
-        <input
-          type="text"
-          placeholder="Search by haiku text or ID..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-        />
+        <h2 className="text-lg font-semibold mb-4">Search Haikus</h2>
+        <div className="flex gap-4">
+          <input
+            type="text"
+            placeholder="Search by haiku text or ID..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+          />
+          <button
+            onClick={handleSearch}
+            className="btn-primary px-6"
+          >
+            Search
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -427,7 +440,7 @@ function ManageHaikus({ token }) {
       ) : (
         <>
           <div className="space-y-6 mb-8">
-            {filteredHaikus?.map((haiku) => (
+            {haikus?.map((haiku) => (
               <div key={haiku.id} className="haiku-card">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -471,7 +484,7 @@ function ManageHaikus({ token }) {
             </span>
             <button
               onClick={() => setPage((p) => p + 1)}
-              disabled={!filteredHaikus || filteredHaikus.length < limit}
+              disabled={!haikus || haikus.length < limit}
               className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next

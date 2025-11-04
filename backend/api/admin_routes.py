@@ -92,6 +92,7 @@ def list_lines(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     syllable_count: Optional[int] = None,
+    search: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     _authenticated: bool = Depends(verify_admin_token)
@@ -102,6 +103,7 @@ def list_lines(
     - start_date: ISO format date (YYYY-MM-DD)
     - end_date: ISO format date (YYYY-MM-DD)
     - syllable_count: Filter by syllable count
+    - search: Search by text, username, or ID
     - skip: Offset for pagination
     - limit: Max results to return
     """
@@ -125,6 +127,15 @@ def list_lines(
 
         if syllable_count:
             query = query.filter(Line.syllable_count == syllable_count)
+
+        if search:
+            # Search in text, username, or ID
+            search_term = f"%{search}%"
+            query = query.filter(
+                (Line.text.ilike(search_term)) |
+                (Line.username.ilike(search_term)) |
+                (Line.id == int(search) if search.isdigit() else False)
+            )
 
         # Get results
         lines = query.order_by(Line.timestamp.desc()).offset(skip).limit(limit).all()
