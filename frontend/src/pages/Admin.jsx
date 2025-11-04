@@ -171,6 +171,7 @@ function Admin() {
 function ManageLines({ token }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
   const { data: lines, isLoading } = useQuery({
@@ -240,11 +241,22 @@ function ManageLines({ token }) {
     },
   });
 
+  // Filter lines based on search term
+  const filteredLines = lines?.filter((line) => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      line.text.toLowerCase().includes(search) ||
+      line.username.toLowerCase().includes(search) ||
+      line.id.toString().includes(search)
+    );
+  });
+
   return (
     <div>
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Filter Lines</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Start Date
@@ -264,6 +276,18 @@ function ManageLines({ token }) {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Search
+            </label>
+            <input
+              type="text"
+              placeholder="Search by text, user, or ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
           </div>
@@ -300,7 +324,7 @@ function ManageLines({ token }) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {lines?.map((line) => (
+              {filteredLines?.map((line) => (
                 <tr key={line.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {line.id}
@@ -339,6 +363,7 @@ function ManageLines({ token }) {
 
 function ManageHaikus({ token }) {
   const [page, setPage] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
   const limit = 20;
   const queryClient = useQueryClient();
 
@@ -369,8 +394,32 @@ function ManageHaikus({ token }) {
     },
   });
 
+  // Filter haikus based on search term
+  const filteredHaikus = haikus?.filter((haiku) => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      haiku.full_text.toLowerCase().includes(search) ||
+      haiku.id.toString().includes(search)
+    );
+  });
+
   return (
     <div>
+      {/* Search Bar */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Search Haikus
+        </label>
+        <input
+          type="text"
+          placeholder="Search by haiku text or ID..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        />
+      </div>
+
       {isLoading ? (
         <div className="text-center py-12">
           <p>Loading haikus...</p>
@@ -378,7 +427,7 @@ function ManageHaikus({ token }) {
       ) : (
         <>
           <div className="space-y-6 mb-8">
-            {haikus?.map((haiku) => (
+            {filteredHaikus?.map((haiku) => (
               <div key={haiku.id} className="haiku-card">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -422,7 +471,7 @@ function ManageHaikus({ token }) {
             </span>
             <button
               onClick={() => setPage((p) => p + 1)}
-              disabled={!haikus || haikus.length < limit}
+              disabled={!filteredHaikus || filteredHaikus.length < limit}
               className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
@@ -441,6 +490,7 @@ function SyllableCheck({ token }) {
   const [includeValidated, setIncludeValidated] = useState(false);
   const [results, setResults] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
   const handleCheck = async () => {
@@ -611,9 +661,23 @@ function SyllableCheck({ token }) {
               Found {results.length} line(s) with incorrect syllable counts
             </h3>
             {results.length > 0 && (
-              <p className="text-sm text-gray-600 mb-2">
-                Using method: <span className="font-medium">{results[0].method}</span>
-              </p>
+              <>
+                <p className="text-sm text-gray-600 mb-4">
+                  Using method: <span className="font-medium">{results[0].method}</span>
+                </p>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Search Results
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Search by text, user, or ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </>
             )}
             {results.length === 0 && (
               <p className="text-gray-600">
@@ -622,7 +686,19 @@ function SyllableCheck({ token }) {
             )}
           </div>
 
-          {results.length > 0 && (
+          {results.length > 0 && (() => {
+            // Filter results based on search term
+            const filteredResults = results.filter((result) => {
+              if (!searchTerm) return true;
+              const search = searchTerm.toLowerCase();
+              return (
+                result.text.toLowerCase().includes(search) ||
+                result.username.toLowerCase().includes(search) ||
+                result.id.toString().includes(search)
+              );
+            });
+
+            return filteredResults.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -647,7 +723,7 @@ function SyllableCheck({ token }) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {results.map((result) => (
+                {filteredResults.map((result) => (
                   <tr key={result.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {result.id}
@@ -697,7 +773,12 @@ function SyllableCheck({ token }) {
                 ))}
               </tbody>
             </table>
-          )}
+            ) : (
+              <div className="p-6 text-center text-gray-500">
+                No results match your search.
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
