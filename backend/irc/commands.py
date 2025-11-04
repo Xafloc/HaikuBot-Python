@@ -38,6 +38,11 @@ class Response:
         """Create a success response (sent publicly to channel)."""
         return cls(message=message, is_notice=False)
 
+    @classmethod
+    def notice(cls, message: str) -> 'Response':
+        """Create a notice response (sent as private NOTICE, non-intrusive confirmation)."""
+        return cls(message=message, is_notice=True)
+
 
 class CommandHandler:
     """Handles IRC command parsing and execution."""
@@ -233,7 +238,7 @@ class CommandHandler:
                 logger.error(f"Error broadcasting line to WebSocket: {ws_error}")
 
             placement_str = f" ({placement} position)" if placement != 'any' else ""
-            return Response.success(f"Added 5-syllable line{placement_str}: {text}")
+            return Response.notice(f"Added 5-syllable line{placement_str}: {text}")
 
     async def _cmd_haiku7(self, username: str, channel: str, args: str) -> Response:
         """Submit a 7-syllable line."""
@@ -290,7 +295,7 @@ class CommandHandler:
             except Exception as ws_error:
                 logger.error(f"Error broadcasting line to WebSocket: {ws_error}")
 
-            return Response.success(f"Added 7-syllable line: {text}")
+            return Response.notice(f"Added 7-syllable line: {text}")
 
     async def _cmd_stats(self, username: str, channel: str, args: str) -> Response:
         """Show haiku statistics."""
@@ -334,7 +339,7 @@ class CommandHandler:
             session.add(vote)
             session.commit()
 
-            return Response.success(f"Thanks for voting! Haiku #{haiku_id} now has {len(haiku.votes) + 1} vote(s).")
+            return Response.notice(f"Thanks for voting! Haiku #{haiku_id} now has {len(haiku.votes) + 1} vote(s).")
     
     async def _cmd_top(self, username: str, channel: str, args: str) -> Response:
         """Show top voted haikus."""
