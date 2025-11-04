@@ -35,7 +35,7 @@ function Statistics() {
       <h1 className="text-4xl font-bold text-gray-800 mb-8">Statistics</h1>
 
       {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {statsLoading ? (
           <div className="col-span-full text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-haiku-600"></div>
@@ -62,16 +62,22 @@ function Statistics() {
               </div>
               <div className="text-green-100">Generated Haikus</div>
             </div>
-
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-              <div className={`font-bold mb-2 ${getDynamicFontSize(stats.possible_permutations)}`}>
-                {formatNumber(stats.possible_permutations)}
-              </div>
-              <div className="text-orange-100">Possible Combinations</div>
-            </div>
           </>
         ) : null}
       </div>
+
+      {/* Possible Combinations - Full Width */}
+      {!statsLoading && stats && (
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-8 mb-12 text-white text-center">
+          <div className={`font-bold mb-3 ${getDynamicFontSize(stats.possible_permutations)}`}>
+            {formatNumber(stats.possible_permutations)}
+          </div>
+          <div className="text-orange-100 text-lg">Possible Combinations</div>
+          <div className="text-orange-200 text-sm mt-2 opacity-80">
+            Total unique haiku permutations from available lines
+          </div>
+        </div>
+      )}
 
       {/* Detailed Stats */}
       {stats && (
