@@ -184,6 +184,9 @@ function ManageLines({ token }) {
   const [endDate, setEndDate] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingLineId, setEditingLineId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [editSyllables, setEditSyllables] = useState(5);
   const queryClient = useQueryClient();
 
   const { data: lines, isLoading } = useQuery({
@@ -257,6 +260,54 @@ function ManageLines({ token }) {
       }
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ lineId, text, syllable_count }) => {
+      const response = await fetch(`${API_BASE}/admin/lines/${lineId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, syllable_count }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update line');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-lines']);
+      setEditingLineId(null);
+      alert('Line updated successfully!');
+    },
+    onError: () => {
+      alert('Failed to update line');
+    },
+  });
+
+  const handleEditClick = (line) => {
+    setEditingLineId(line.id);
+    setEditText(line.text);
+    setEditSyllables(line.syllable_count);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editText.trim()) {
+      alert('Text cannot be empty');
+      return;
+    }
+    updateMutation.mutate({
+      lineId: editingLineId,
+      text: editText,
+      syllable_count: editSyllables,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLineId(null);
+    setEditText('');
+    setEditSyllables(5);
+  };
 
   return (
     <div>
@@ -343,13 +394,35 @@ function ManageLines({ token }) {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {lines?.map((line) => (
-                <tr key={line.id}>
+                <tr key={line.id} className={editingLineId === line.id ? "bg-blue-50" : "hover:bg-gray-50"}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {line.id}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{line.text}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {editingLineId === line.id ? (
+                      <input
+                        type="text"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded"
+                      />
+                    ) : (
+                      line.text
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {line.syllable_count}
+                    {editingLineId === line.id ? (
+                      <select
+                        value={editSyllables}
+                        onChange={(e) => setEditSyllables(parseInt(e.target.value))}
+                        className="px-2 py-1 border border-gray-300 rounded"
+                      >
+                        <option value={5}>5</option>
+                        <option value={7}>7</option>
+                      </select>
+                    ) : (
+                      line.syllable_count
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {line.username}
@@ -357,17 +430,42 @@ function ManageLines({ token }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(line.timestamp).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete line: "${line.text}"?`)) {
-                          deleteMutation.mutate({ lineId: line.id });
-                        }
-                      }}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                    {editingLineId === line.id ? (
+                      <>
+                        <button
+                          onClick={handleSaveEdit}
+                          className="text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleEditClick(line)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete line: "${line.text}"?`)) {
+                              deleteMutation.mutate({ lineId: line.id });
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
