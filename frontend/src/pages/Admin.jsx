@@ -156,6 +156,16 @@ function Admin() {
             >
               Syllable Validation
             </button>
+            <button
+              onClick={() => setActiveTab('flagged')}
+              className={`${
+                activeTab === 'flagged'
+                  ? 'border-haiku-500 text-haiku-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Flagged Lines
+            </button>
           </nav>
         </div>
       </div>
@@ -164,6 +174,7 @@ function Admin() {
       {activeTab === 'lines' && <ManageLines token={token} />}
       {activeTab === 'haikus' && <ManageHaikus token={token} />}
       {activeTab === 'syllable-check' && <SyllableCheck token={token} />}
+      {activeTab === 'flagged' && <ManageFlaggedLines token={token} />}
     </div>
   );
 }
@@ -897,6 +908,148 @@ function SyllableCheck({ token }) {
               </div>
             );
           })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManageFlaggedLines({ token }) {
+  const queryClient = useQueryClient();
+
+  const { data: lines, isLoading } = useQuery({
+    queryKey: ['admin-flagged-lines'],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE}/admin/lines/flagged?limit=1000`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch flagged lines');
+      return response.json();
+    },
+  });
+
+  const unflagMutation = useMutation({
+    mutationFn: async ({ lineId }) => {
+      const response = await fetch(`${API_BASE}/admin/lines/${lineId}/unflag`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error('Failed to unflag line');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-flagged-lines']);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ lineId, cascade }) => {
+      const response = await fetch(`${API_BASE}/admin/lines/${lineId}?cascade=${cascade}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw error;
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-flagged-lines']);
+    },
+  });
+
+  if (isLoading) {
+    return <div className="text-center py-8">Loading flagged lines...</div>;
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Flagged Lines</h2>
+        <p className="text-gray-600">
+          Lines flagged by editors for review. You can unflag to keep them or delete them permanently.
+        </p>
+      </div>
+
+      {lines && lines.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Text
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Syllables
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  User
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Channel
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {lines.map((line) => (
+                <tr key={line.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {line.id}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {line.text}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {line.syllable_count}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {line.username}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {line.channel}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <button
+                      onClick={() => unflagMutation.mutate({ lineId: line.id })}
+                      disabled={unflagMutation.isPending}
+                      className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                    >
+                      {unflagMutation.isPending ? 'Unflagging...' : 'Unflag'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete line #${line.id}? This will also delete any haikus using this line.`
+                          )
+                        ) {
+                          deleteMutation.mutate({ lineId: line.id, cascade: true });
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                    >
+                      {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          No flagged lines. Lines flagged by editors will appear here.
         </div>
       )}
     </div>

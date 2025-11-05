@@ -52,6 +52,10 @@ This is a rewrite of an original Perl-based bot that successfully ran for years.
 - Primary storage for all collected/submitted lines
 - Tracks: text, syllable_count, server, channel, username, timestamp, source, placement
 - UNIQUE constraint on text (case-insensitive) to prevent duplicates
+- **Quality Control Fields**:
+  - `approved` (Boolean, default=True): Controls whether line can be used in haiku generation. Set to False to exclude from generation without deleting.
+  - `human_validated` (Boolean, default=False): Admin verified the syllable count is correct despite algorithm disagreement. Used when syllable counter gets it wrong but human confirms it's correct.
+  - `flagged_for_deletion` (Boolean, default=False): Editor flagged line as problematic. Admin can review and delete or unflag.
 
 **`generated_haikus`**: Complete haikus (three lines combined)
 - References three `lines` records (line1_id, line2_id, line3_id)
@@ -88,6 +92,7 @@ This is a rewrite of an original Perl-based bot that successfully ran for years.
 - `!haiku5 --first <text>` - Submit with first-position preference
 - `!haiku5 --last <text>` - Submit with last-position preference
 - `!haiku7 <text>` - Submit 7-syllable line
+- `!haikuflag <line_id>` - Flag a line for admin review/deletion
 
 **Admin** (bot owner only):
 - `!haiku promote @username` - Grant editor privileges

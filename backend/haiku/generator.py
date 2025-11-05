@@ -40,9 +40,9 @@ def generate_haiku(
         GeneratedHaiku object or None if insufficient lines
     """
     # Build base query filters
-    filters_5_first = [Line.syllable_count == 5, Line.approved == True]
-    filters_7 = [Line.syllable_count == 7, Line.approved == True]
-    filters_5_last = [Line.syllable_count == 5, Line.approved == True]
+    filters_5_first = [Line.syllable_count == 5, Line.approved == True, Line.flagged_for_deletion == False]
+    filters_7 = [Line.syllable_count == 7, Line.approved == True, Line.flagged_for_deletion == False]
+    filters_5_last = [Line.syllable_count == 5, Line.approved == True, Line.flagged_for_deletion == False]
     
     # Add placement restrictions
     filters_5_first.append(or_(Line.placement == None, Line.placement.in_(['any', 'first'])))

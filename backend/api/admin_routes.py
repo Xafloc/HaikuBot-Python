@@ -151,6 +151,9 @@ def list_lines(
                 "server": line.server,
                 "source": line.source,
                 "timestamp": line.timestamp.isoformat(),
+                "flagged_for_deletion": line.flagged_for_deletion,
+                "approved": line.approved,
+                "human_validated": line.human_validated,
             }
             for line in lines
         ]
@@ -355,3 +358,70 @@ def check_syllables(
                 ))
 
         return results
+
+
+@router.get("/lines/flagged")
+def list_flagged_lines(
+    skip: int = 0,
+    limit: int = 100,
+    _authenticated: bool = Depends(verify_admin_token)
+) -> List[dict]:
+    """List lines flagged for deletion.
+
+    Query params:
+    - skip: Offset for pagination
+    - limit: Max results to return
+    """
+    with get_session() as session:
+        query = session.query(Line).filter(Line.flagged_for_deletion == True)
+
+        lines = query.order_by(Line.timestamp.desc()).offset(skip).limit(limit).all()
+
+        return [
+            {
+                "id": line.id,
+                "text": line.text,
+                "syllable_count": line.syllable_count,
+                "placement": line.placement,
+                "username": line.username,
+                "channel": line.channel,
+                "server": line.server,
+                "source": line.source,
+                "timestamp": line.timestamp.isoformat(),
+                "flagged_for_deletion": line.flagged_for_deletion,
+                "approved": line.approved,
+                "human_validated": line.human_validated,
+            }
+            for line in lines
+        ]
+
+
+@router.post("/lines/{line_id}/unflag")
+def unflag_line(
+    line_id: int,
+    _authenticated: bool = Depends(verify_admin_token)
+) -> dict:
+    """Unflag a line (remove the deletion flag).
+
+    Args:
+        line_id: ID of line to unflag
+    """
+    with get_session() as session:
+        line = session.query(Line).filter(Line.id == line_id).first()
+
+        if not line:
+            raise HTTPException(status_code=404, detail="Line not found")
+
+        if not line.flagged_for_deletion:
+            raise HTTPException(status_code=400, detail="Line is not flagged")
+
+        line.flagged_for_deletion = False
+        session.commit()
+
+        logger.info(f"Admin unflagged line {line_id}: '{line.text}'")
+
+        return {
+            "success": True,
+            "message": f"Unflagged line {line_id}",
+            "line_text": line.text
+        }

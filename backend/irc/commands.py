@@ -94,6 +94,7 @@ class CommandHandler:
             'haikuhelp': self._cmd_help,
             'haikulist': self._cmd_list,
             'haikusyl': self._cmd_syllable_check,
+            'haikuflag': self._cmd_flag,
         }
         
         # Check for subcommands (e.g., "haiku promote")
@@ -304,6 +305,35 @@ class CommandHandler:
                 logger.error(f"Error broadcasting line to WebSocket: {ws_error}")
 
             return Response.notice(f"Added 7-syllable line: {text}")
+
+    async def _cmd_flag(self, username: str, channel: str, args: str) -> Response:
+        """Flag a line for admin review/deletion."""
+        # Check authorization
+        if not can_user_submit(username):
+            return Response.error(f"You need editor privileges. Contact {self.config.bot.owner} for access.")
+
+        if not args or not args.strip().isdigit():
+            return Response.error("Usage: !haikuflag <line_id>")
+
+        line_id = int(args.strip())
+
+        with get_session() as session:
+            # Check if line exists
+            line = session.query(Line).filter(Line.id == line_id).first()
+            if not line:
+                return Response.error(f"Line #{line_id} not found.")
+
+            # Check if already flagged
+            if line.flagged_for_deletion:
+                return Response.error(f"Line #{line_id} is already flagged for deletion.")
+
+            # Flag the line
+            line.flagged_for_deletion = True
+            session.commit()
+
+            logger.info(f"Line {line_id} flagged by {username}: '{line.text}'")
+
+            return Response.notice(f"Flagged line #{line_id} for admin review: {line.text}")
 
     async def _cmd_stats(self, username: str, channel: str, args: str) -> Response:
         """Show haiku statistics."""

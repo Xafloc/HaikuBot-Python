@@ -9,6 +9,7 @@ from sqlalchemy import func, desc
 
 from ..database import get_session, Line, GeneratedHaiku, Vote, User
 from ..haiku import generate_haiku, get_haiku_stats
+from ..utils.auth import get_or_create_user
 
 logger = logging.getLogger(__name__)
 
@@ -444,4 +445,54 @@ async def get_leaderboard(limit: int = Query(10, ge=1, le=50)):
             })
         
         return leaderboard
+
+
+class FlagLineRequest(BaseModel):
+    """Request model for flagging a line."""
+    username: str
+    reason: Optional[str] = None
+
+
+@router.post("/lines/{line_id}/flag")
+async def flag_line(line_id: int, request: FlagLineRequest):
+    """Flag a line for admin review/deletion.
+
+    Only editors and admins can flag lines.
+
+    Args:
+        line_id: Line ID to flag
+        request: Flag request with username
+
+    Returns:
+        Success message
+    """
+    with get_session() as session:
+        # Check if user has editor or admin role
+        user = get_or_create_user(session, request.username)
+        if not user.can_submit():
+            raise HTTPException(
+                status_code=403,
+                detail="Only editors and admins can flag lines"
+            )
+
+        # Check if line exists
+        line = session.query(Line).filter(Line.id == line_id).first()
+        if not line:
+            raise HTTPException(status_code=404, detail="Line not found")
+
+        # Check if already flagged
+        if line.flagged_for_deletion:
+            raise HTTPException(status_code=400, detail="Line is already flagged")
+
+        # Flag the line
+        line.flagged_for_deletion = True
+        session.commit()
+
+        logger.info(f"Line {line_id} flagged by {request.username}: '{line.text}'")
+
+        return {
+            "message": "Line flagged for review",
+            "line_id": line_id,
+            "line_text": line.text
+        }
 

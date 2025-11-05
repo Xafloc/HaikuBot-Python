@@ -30,6 +30,7 @@ class Line(Base):
     placement = Column(String(10), nullable=True)  # 'any', 'first', 'last', or NULL (for 7-syl)
     approved = Column(Boolean, default=True)
     human_validated = Column(Boolean, default=False, nullable=False)  # Admin verified syllable count is correct
+    flagged_for_deletion = Column(Boolean, default=False, nullable=False)  # Editor flagged for admin review
     
     # Indexes for query performance
     __table_args__ = (
