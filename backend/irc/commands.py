@@ -490,42 +490,40 @@ class CommandHandler:
     
     async def _cmd_help(self, username: str, channel: str, args: str) -> Response:
         """Show help information."""
-        help_text = f"""HaikuBot Commands:
-{self.prefix}haiku - Generate random haiku
-{self.prefix}haiku @user - Generate from user's lines
-{self.prefix}haiku #channel - Generate from channel's lines
-{self.prefix}haikumanual - Generate from editor-submitted lines only
-{self.prefix}haikuauto - Generate from auto-collected lines only
-{self.prefix}haikustats - Show statistics
-{self.prefix}haikuvote <id> - Vote for a haiku
-{self.prefix}haikutop - Show top voted haikus
-{self.prefix}myhaiku - Show your contributions
-{self.prefix}mystats - Show your stats
-{self.prefix}haikusyl <text> - Check syllable count
-
-Editor Commands:
-{self.prefix}haiku5 <text> - Submit 5-syllable line
-{self.prefix}haiku5 --first <text> - First position only
-{self.prefix}haiku5 --last <text> - Last position only
-{self.prefix}haiku7 <text> - Submit 7-syllable line
-{self.prefix}haikuflag <line_id> - Flag line for admin review
-
-Admin Commands:
-{self.prefix}haiku promote @user - Grant editor privileges
-{self.prefix}haiku demote @user - Revoke editor privileges
-{self.prefix}haiku delete line <id> - Delete a line
-{self.prefix}haiku delete haiku <id> - Delete a haiku
-{self.prefix}haiku editors - List editors
-
-Web: {self.config.bot.web_url}"""
+        help_lines = [
+            "=== HaikuBot Commands ===",
+            f"{self.prefix}haiku - Generate random haiku",
+            f"{self.prefix}haiku @user - Generate from user's lines",
+            f"{self.prefix}haiku #channel - Generate from channel's lines",
+            f"{self.prefix}haikumanual - Generate from manual lines only",
+            f"{self.prefix}haikuauto - Generate from auto-collected lines only",
+            f"{self.prefix}haikustats - Statistics | {self.prefix}haikuvote <id> - Vote",
+            f"{self.prefix}haikutop - Top haikus | {self.prefix}myhaiku - Your lines",
+            f"{self.prefix}mystats - Your stats | {self.prefix}haikusyl <text> - Check syllables",
+            "",
+            "=== Editor Commands ===",
+            f"{self.prefix}haiku5 <text> - Submit 5-syllable line",
+            f"{self.prefix}haiku5 --first <text> - First position only",
+            f"{self.prefix}haiku5 --last <text> - Last position only",
+            f"{self.prefix}haiku7 <text> - Submit 7-syllable line",
+            f"{self.prefix}haikuflag <line_id> - Flag line for review",
+            "",
+            "=== Admin Commands ===",
+            f"{self.prefix}haiku promote/demote @user - Manage editors",
+            f"{self.prefix}haiku delete line/haiku <id> - Delete content",
+            f"{self.prefix}haiku editors - List all editors",
+            "",
+            f"Web: {self.config.bot.web_url}"
+        ]
 
         # Send as PM if in channel
         if channel != "PM":
-            for line in help_text.split('\n'):
-                self.bot.send_notice(username, line)
+            for line in help_lines:
+                if line:  # Only send non-empty lines
+                    self.bot.send_notice(username, line)
             return Response.success(f"{username}: Sent help via notice")
         else:
-            return Response.success(help_text)
+            return Response.success('\n'.join(help_lines))
     
     async def _cmd_list(self, username: str, channel: str, args: str) -> Response:
         """List generated haikus."""
