@@ -464,6 +464,7 @@ Editor Commands:
 {self.prefix}haiku5 --first <text> - First position only
 {self.prefix}haiku5 --last <text> - Last position only
 {self.prefix}haiku7 <text> - Submit 7-syllable line
+{self.prefix}haikuflag <line_id> - Flag line for admin review
 
 Admin Commands:
 {self.prefix}haiku promote @user - Grant editor privileges
