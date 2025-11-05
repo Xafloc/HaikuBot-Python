@@ -86,6 +86,8 @@ class CommandHandler:
             'haiku': self._cmd_haiku,
             'haiku5': self._cmd_haiku5,
             'haiku7': self._cmd_haiku7,
+            'haikumanual': self._cmd_haiku_manual,
+            'haikuauto': self._cmd_haiku_auto,
             'haikustats': self._cmd_stats,
             'haikuvote': self._cmd_vote,
             'haikutop': self._cmd_top,
@@ -177,7 +179,47 @@ class CommandHandler:
             url_part = f" -- {web_url}" if web_url else ""
 
             return Response.success(f"{haiku.full_text} -- `{self.prefix}haikuvote {haiku.id}` -- Sources: {sources}{url_part}")
-    
+
+    async def _cmd_haiku_manual(self, username: str, channel: str, args: str) -> Response:
+        """Generate a haiku using only manually submitted lines."""
+        with get_session() as session:
+            haiku = generate_haiku(
+                session, username, self.bot.server_name, channel,
+                source_filter='manual'
+            )
+
+            if not haiku:
+                return Response.error("Not enough manual lines to generate a haiku. Editors can submit with !haiku5 or !haiku7!")
+
+            # Get sources (usernames of each line contributor)
+            sources = f"({haiku.line1.username}, {haiku.line2.username}, {haiku.line3.username})"
+
+            # Format response with sources and URL
+            web_url = self.config.bot.web_url if hasattr(self.config.bot, 'web_url') else ""
+            url_part = f" -- {web_url}" if web_url else ""
+
+            return Response.success(f"[Manual] {haiku.full_text} -- `{self.prefix}haikuvote {haiku.id}` -- Sources: {sources}{url_part}")
+
+    async def _cmd_haiku_auto(self, username: str, channel: str, args: str) -> Response:
+        """Generate a haiku using only auto-collected lines."""
+        with get_session() as session:
+            haiku = generate_haiku(
+                session, username, self.bot.server_name, channel,
+                source_filter='auto'
+            )
+
+            if not haiku:
+                return Response.error("Not enough auto-collected lines to generate a haiku. Lines are automatically collected from IRC.")
+
+            # Get sources (usernames of each line contributor)
+            sources = f"({haiku.line1.username}, {haiku.line2.username}, {haiku.line3.username})"
+
+            # Format response with sources and URL
+            web_url = self.config.bot.web_url if hasattr(self.config.bot, 'web_url') else ""
+            url_part = f" -- {web_url}" if web_url else ""
+
+            return Response.success(f"[Auto] {haiku.full_text} -- `{self.prefix}haikuvote {haiku.id}` -- Sources: {sources}{url_part}")
+
     async def _cmd_haiku5(self, username: str, channel: str, args: str) -> Response:
         """Submit a 5-syllable line.
 
@@ -452,6 +494,8 @@ class CommandHandler:
 {self.prefix}haiku - Generate random haiku
 {self.prefix}haiku @user - Generate from user's lines
 {self.prefix}haiku #channel - Generate from channel's lines
+{self.prefix}haikumanual - Generate from editor-submitted lines only
+{self.prefix}haikuauto - Generate from auto-collected lines only
 {self.prefix}haikustats - Show statistics
 {self.prefix}haikuvote <id> - Vote for a haiku
 {self.prefix}haikutop - Show top voted haikus

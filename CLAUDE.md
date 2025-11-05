@@ -82,6 +82,8 @@ This is a rewrite of an original Perl-based bot that successfully ran for years.
 - `!haiku` - Generate random haiku
 - `!haiku @username` - Generate using specific user's lines
 - `!haiku #channel` - Generate from specific channel
+- `!haikumanual` - Generate from editor-submitted lines only
+- `!haikuauto` - Generate from auto-collected lines only
 - `!haikustats` - Statistics
 - `!haikuvote <id>` - Upvote haiku
 - `!haikutop` - Top voted haikus

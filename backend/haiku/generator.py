@@ -18,15 +18,16 @@ def generate_haiku(
     channel: str,
     username_filter: Optional[str] = None,
     channel_filter: Optional[str] = None,
-    server_filter: Optional[str] = None
+    server_filter: Optional[str] = None,
+    source_filter: Optional[str] = None
 ) -> Optional[GeneratedHaiku]:
     """Generate a random haiku from available lines.
-    
+
     Implements smart placement logic:
     - Line 1 (5 syl): Cannot have placement='last'
     - Line 2 (7 syl): Any 7-syllable line
     - Line 3 (5 syl): Cannot have placement='first'
-    
+
     Args:
         session: Database session
         triggered_by: Username who triggered generation
@@ -35,7 +36,8 @@ def generate_haiku(
         username_filter: Optional filter by username
         channel_filter: Optional filter by channel
         server_filter: Optional filter by server
-        
+        source_filter: Optional filter by source ('auto' or 'manual')
+
     Returns:
         GeneratedHaiku object or None if insufficient lines
     """
@@ -63,7 +65,12 @@ def generate_haiku(
         filters_5_first.append(Line.server == server_filter)
         filters_7.append(Line.server == server_filter)
         filters_5_last.append(Line.server == server_filter)
-    
+
+    if source_filter:
+        filters_5_first.append(Line.source == source_filter)
+        filters_7.append(Line.source == source_filter)
+        filters_5_last.append(Line.source == source_filter)
+
     # Query for available lines
     line1_candidates = session.query(Line).filter(and_(*filters_5_first)).all()
     line2_candidates = session.query(Line).filter(and_(*filters_7)).all()
