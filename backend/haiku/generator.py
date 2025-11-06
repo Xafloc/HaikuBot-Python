@@ -94,8 +94,25 @@ def generate_haiku(
     # Randomly select lines
     line1 = random.choice(line1_candidates)
     line2 = random.choice(line2_candidates)
-    line3 = random.choice(line3_candidates)
-    
+
+    # Ensure line3 is different from line1 (avoid duplicate 5-syllable lines)
+    line3_candidates_filtered = [line for line in line3_candidates if line.id != line1.id]
+
+    # If filtering removed all candidates and we have more than one candidate total, retry
+    if not line3_candidates_filtered and len(line3_candidates) > 1:
+        # This shouldn't happen, but fallback to original list
+        line3_candidates_filtered = line3_candidates
+    elif not line3_candidates_filtered:
+        # Only one 5-syllable line available, must use it even if duplicate
+        logger.warning(f"Only one 5-syllable line available, allowing duplicate")
+        line3_candidates_filtered = line3_candidates
+
+    line3 = random.choice(line3_candidates_filtered)
+
+    # Log if we ended up with duplicate despite filtering
+    if line1.id == line3.id:
+        logger.warning(f"Haiku has duplicate line (only one 5-syllable line available): '{line1.text}'")
+
     # Construct full haiku text
     full_text = f"{line1.text} / {line2.text} / {line3.text}"
     
